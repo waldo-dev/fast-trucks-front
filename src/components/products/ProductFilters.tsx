@@ -145,3 +145,4 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
   );
 };
 
+

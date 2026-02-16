@@ -96,3 +96,4 @@ export const ProductTable: React.FC<ProductTableProps> = ({
   );
 };
 
+
