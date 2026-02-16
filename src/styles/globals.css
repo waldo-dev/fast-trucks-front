@@ -1,0 +1,69 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background-color: #f8f7f5;
+  color: #181411;
+}
+
+.food-overlay {
+  background: linear-gradient(to bottom, rgba(34, 25, 16, 0.3), rgba(34, 25, 16, 0.8));
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e6e0db;
+  border-radius: 10px;
+}
+
+.active-tab {
+  border-bottom: 3px solid #f27f0d;
+  color: #f27f0d;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.status-new {
+  background-color: #fef9c3;
+  color: #854d0e;
+}
+
+.status-preparing {
+  background-color: #f27f0d;
+  color: #ffffff;
+}
+
+.status-ready {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.status-delivered {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
