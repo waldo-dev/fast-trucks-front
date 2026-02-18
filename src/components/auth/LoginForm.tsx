@@ -1,16 +1,34 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { login } from '@/lib/auth';
 
 export const LoginForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Placeholder: sin acción real
+    setError(null);
+    setLoading(true);
+    try {
+      await login(email, password, { remember: rememberMe });
+      router.push('/');
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message || 'No se pudo iniciar sesión'
+          : 'No se pudo iniciar sesión'
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -21,7 +39,7 @@ export const LoginForm = () => {
           <span className="material-symbols-outlined text-2xl">restaurant</span>
         </div>
         <span className="text-[#181411] dark:text-white text-xl font-bold tracking-tight">
-          FoodSaaS
+        Fast Trucks
         </span>
       </div>
 
@@ -111,11 +129,18 @@ export const LoginForm = () => {
         </div>
 
         {/* Submit Button */}
+        {error && (
+          <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm font-semibold">
+            {error}
+          </div>
+        )}
+
         <button
-          className="w-full h-14 bg-primary hover:bg-primary/90 text-white font-bold text-lg rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 group"
+          className="w-full h-14 bg-primary hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-lg rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 group"
           type="submit"
+          disabled={loading}
         >
-          Iniciar Sesión en el Panel
+          {loading ? 'Iniciando...' : 'Iniciar Sesión en el Panel'}
           <span className="material-symbols-outlined text-xl group-hover:translate-x-1 transition-transform">
             arrow_forward
           </span>
@@ -134,7 +159,7 @@ export const LoginForm = () => {
 
       {/* Subtle Brand Footer */}
       <div className="mt-auto pt-10 flex justify-center items-center gap-4 text-[#8a7560] text-[10px] uppercase tracking-[0.2em]">
-        <span>© 2024 FoodSaaS Inc.</span>
+        <span>© 2024 Chilsmart Inc.</span>
         <span className="h-1 w-1 rounded-full bg-[#8a7560]"></span>
         <a className="hover:text-primary transition-colors" href="#">
           Política de Privacidad
@@ -147,5 +172,6 @@ export const LoginForm = () => {
     </div>
   );
 };
+
 
 

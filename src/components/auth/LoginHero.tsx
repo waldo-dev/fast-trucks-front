@@ -16,7 +16,7 @@ export const LoginHero = () => {
             <div className="bg-primary p-2 rounded-lg text-white">
               <span className="material-symbols-outlined text-3xl">restaurant</span>
             </div>
-            <span className="text-white text-2xl font-bold tracking-tight">FoodSaaS</span>
+            <span className="text-white text-2xl font-bold tracking-tight">Fast Trucks</span>
           </div>
           <h1 className="text-white text-5xl lg:text-6xl font-extrabold leading-tight mb-4">
             Gestiona tu sabor, en cualquier lugar.
@@ -30,5 +30,6 @@ export const LoginHero = () => {
     </div>
   );
 };
+
 
 

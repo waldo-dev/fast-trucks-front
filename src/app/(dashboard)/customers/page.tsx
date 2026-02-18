@@ -1,11 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { CustomerStats } from '@/components/customers/CustomerStats';
 import { CustomerTable } from '@/components/customers/CustomerTable';
 
 export default function CustomersPage() {
   const [expandedCustomer, setExpandedCustomer] = useState<number | null>(4);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    status: 'Active',
+  });
 
   const customers = [
     {
@@ -145,8 +152,23 @@ export default function CustomersPage() {
   };
 
   const handleNewCustomer = () => {
-    // Placeholder: sin acción real
-    console.log('Nuevo cliente');
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setNewCustomer({
+      name: '',
+      email: '',
+      phone: '',
+      status: 'Active',
+    });
+  };
+
+  const handleSubmitNewCustomer = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    console.log('Crear cliente:', newCustomer);
+    handleCloseModal();
   };
 
   // Agregar isExpanded a cada cliente
@@ -203,6 +225,110 @@ export default function CustomersPage() {
         onToggleExpand={handleToggleExpand}
         onViewProfile={handleViewProfile}
       />
+
+      {/* Modal Crear Cliente */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            onClick={handleCloseModal}
+          />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 md:p-8 border border-primary/10">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[#8a7560] font-semibold">
+                  Nuevo Cliente
+                </p>
+                <h3 className="text-2xl font-black text-[#181411]">Crear cliente</h3>
+              </div>
+              <button
+                onClick={handleCloseModal}
+                className="p-2 rounded-full hover:bg-primary/10 text-[#8a7560] transition-colors"
+                aria-label="Cerrar"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <form className="space-y-4" onSubmit={handleSubmitNewCustomer}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
+                  Nombre completo
+                  <input
+                    required
+                    type="text"
+                    value={newCustomer.name}
+                    onChange={(e) =>
+                      setNewCustomer((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    className="h-11 px-3 rounded-lg border border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm text-[#181411]"
+                    placeholder="Ej. Alex Morgan"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
+                  Correo
+                  <input
+                    required
+                    type="email"
+                    value={newCustomer.email}
+                    onChange={(e) =>
+                      setNewCustomer((prev) => ({ ...prev, email: e.target.value }))
+                    }
+                    className="h-11 px-3 rounded-lg border border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm text-[#181411]"
+                    placeholder="cliente@email.com"
+                  />
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
+                  Teléfono
+                  <input
+                    required
+                    type="tel"
+                    value={newCustomer.phone}
+                    onChange={(e) =>
+                      setNewCustomer((prev) => ({ ...prev, phone: e.target.value }))
+                    }
+                    className="h-11 px-3 rounded-lg border border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm text-[#181411]"
+                    placeholder="+1 (555) 123-4567"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
+                  Estado
+                  <select
+                    value={newCustomer.status}
+                    onChange={(e) =>
+                      setNewCustomer((prev) => ({ ...prev, status: e.target.value }))
+                    }
+                    className="h-11 px-3 rounded-lg border border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm text-[#181411] bg-white"
+                  >
+                    <option value="Active">Activo</option>
+                    <option value="VIP">VIP</option>
+                    <option value="New">Nuevo</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="h-11 px-4 rounded-lg border border-primary/20 text-[#181411] text-sm font-bold hover:bg-primary/5 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="h-11 px-4 rounded-lg bg-primary text-white text-sm font-bold hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
+                >
+                  Guardar cliente
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

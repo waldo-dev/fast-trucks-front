@@ -5,7 +5,7 @@
 
 export const config = {
   api: {
-    baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
+    baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/',
     timeout: parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || '30000', 10),
   },
   app: {
@@ -15,5 +15,6 @@ export const config = {
     enabled: process.env.NEXT_PUBLIC_AUTH_ENABLED === 'true',
   },
 } as const;
+
 
 
