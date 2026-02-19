@@ -5,7 +5,25 @@ import { GatewayCard } from '@/components/payments/GatewayCard';
 import { PaymentMethodsToggle } from '@/components/payments/PaymentMethodsToggle';
 
 export default function PaymentsPage() {
-  const [gateways, setGateways] = useState([
+  type GatewayConfig = {
+    merchantId?: string;
+    secretKey?: string;
+    publicKey?: string;
+    environment: 'test' | 'prod';
+  };
+
+  type Gateway = {
+    id: string;
+    name: string;
+    type: 'online' | 'manual';
+    status: 'active' | 'inactive';
+    icon: string;
+    description: string;
+    requiresConfig: boolean;
+    config?: GatewayConfig;
+  };
+
+  const [gateways, setGateways] = useState<Gateway[]>([
     {
       id: 'transbank',
       name: 'Transbank (Webpay)',
