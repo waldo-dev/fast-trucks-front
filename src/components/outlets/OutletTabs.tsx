@@ -50,3 +50,5 @@ export const OutletTabs: React.FC<OutletTabsProps> = ({ tabs, activeTab, onTabCh
 
 
 
+
+

@@ -44,7 +44,10 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, [pathname, router]);
+    // Solo verificamos una vez al montar para evitar pantalla de "Cargando sesión"
+    // en cada navegación interna; si necesitas volver a validar en caliente,
+    // agrega lógica de refresco/token listener aquí.
+  }, [router]);
 
   if (!ready || checking) {
     return (
