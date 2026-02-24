@@ -10,7 +10,16 @@ const kpis = [
   { label: 'Pedidos totales', value: '89.4k', delta: '+6.7%' },
 ];
 
-const eventos = [
+type EstadoColor = 'amber' | 'emerald' | 'primary';
+
+const eventos: {
+  tipo: string;
+  negocio: string;
+  ubicacion: string;
+  estado: string;
+  estadoColor: EstadoColor;
+  tiempo: string;
+}[] = [
   {
     tipo: 'Pico de latencia del sistema',
     negocio: 'Global Hubs Inc.',
