@@ -18,8 +18,10 @@ export const LoginForm = () => {
     setError(null);
     setLoading(true);
     try {
-      await login(email, password, { remember: rememberMe });
-      router.push('/');
+      const sessionUser = await login(email, password, { remember: rememberMe });
+      const role = sessionUser?.role?.toUpperCase();
+      const destination = role === 'ADMIN' ? '/admin' : '/';
+      router.push(destination);
     } catch (err) {
       setError(
         err instanceof Error

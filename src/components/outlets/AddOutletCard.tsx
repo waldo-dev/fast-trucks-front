@@ -25,3 +25,6 @@ export const AddOutletCard: React.FC<AddOutletCardProps> = ({ onClick }) => {
 
 
 
+
+
+

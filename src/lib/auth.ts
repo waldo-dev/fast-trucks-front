@@ -5,9 +5,40 @@ type StoredUser = {
   name: string;
   email: string;
   avatar?: string;
+  businessId?: string;
+  role?: string;
 };
 
-type LoginResponse = {
+type ApiUser = {
+  id: string | number;
+  name: string;
+  email: string;
+  avatar?: string;
+  business_id?: string | number;
+  businessId?: string | number;
+  role?: string;
+};
+
+type LoginApiResponse = {
+  success: boolean;
+  data: {
+    token: string;
+    refreshToken?: string;
+    role?: string;
+    businessId?: string | number;
+    business_id?: string | number;
+    user: ApiUser;
+  };
+  message?: string;
+};
+
+type MeApiResponse = {
+  success: boolean;
+  data: ApiUser;
+  message?: string;
+};
+
+type NormalizedSession = {
   accessToken: string;
   refreshToken?: string;
   user: StoredUser;
@@ -19,6 +50,40 @@ const USER_KEY = 'fasttrucks_user';
 
 const isBrowser = () => typeof window !== 'undefined';
 
+const mapToStoredUser = (
+  user: ApiUser,
+  fallback?: { business_id?: string | number; businessId?: string | number; role?: string }
+): StoredUser => {
+  const roleValue = user.role ?? fallback?.role;
+  const normalizedRole = roleValue ? String(roleValue).toUpperCase() : undefined;
+  const businessId =
+    user.businessId ??
+    user.business_id ??
+    fallback?.businessId ??
+    (fallback?.business_id ? String(fallback.business_id) : undefined);
+
+  return {
+    id: String(user.id),
+    name: user.name,
+    email: user.email,
+    avatar: user.avatar,
+    businessId: businessId ? String(businessId) : undefined,
+    role: normalizedRole,
+  };
+};
+
+const normalizeLoginResponse = (data: LoginApiResponse['data']): NormalizedSession => {
+  return {
+    accessToken: data.token,
+    refreshToken: data.refreshToken,
+    user: mapToStoredUser(data.user, {
+      business_id: data.business_id,
+      businessId: data.businessId,
+      role: data.role,
+    }),
+  };
+};
+
 const clearStoredSession = () => {
   if (!isBrowser()) return;
   [localStorage, sessionStorage].forEach((storage) => {
@@ -28,15 +93,12 @@ const clearStoredSession = () => {
   });
 };
 
-const storeSession = (
-  data: LoginResponse,
-  remember: boolean
-) => {
+const storeSession = (data: NormalizedSession) => {
   if (!isBrowser()) return;
-  const storage = remember ? localStorage : sessionStorage;
-  const other = remember ? sessionStorage : localStorage;
+  const storage = localStorage;
+  const other = sessionStorage;
 
-  // Limpia la otra sesión para evitar estados mezclados
+  // Limpia la otra sesión para evitar estados mezclados y forzar persistencia
   other.removeItem(ACCESS_TOKEN_KEY);
   other.removeItem(REFRESH_TOKEN_KEY);
   other.removeItem(USER_KEY);
@@ -65,6 +127,10 @@ const getStoredUser = (): StoredUser | null => {
   }
 };
 
+export const getCachedUser = (): StoredUser | null => {
+  return getStoredUser();
+};
+
 export const getAccessToken = (): string | null => {
   return getFromStorage(ACCESS_TOKEN_KEY);
 };
@@ -84,14 +150,26 @@ export const login = async (
   password: string,
   options?: { remember?: boolean }
 ): Promise<StoredUser> => {
-  const remember = options?.remember ?? false;
-  const response = await api.post<LoginResponse>('auth/login', {
-    email,
-    password,
-  });
+  try {
+    const response = await api.post<LoginApiResponse>('auth/login', {
+      email,
+      password,
+    });
 
-  storeSession(response, remember);
-  return response.user;
+    if (!response?.success || !response.data?.token) {
+      throw new Error('No se pudo iniciar sesión, verifica tus credenciales');
+    }
+
+    const normalized = normalizeLoginResponse(response.data);
+    storeSession(normalized);
+    return normalized.user;
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message.includes('401')
+        ? 'Correo o contraseña incorrectos'
+        : 'No se pudo iniciar sesión, verifica tus credenciales';
+    throw new Error(message);
+  }
 };
 
 export const logout = () => {
@@ -107,8 +185,18 @@ export const getCurrentUser = async (): Promise<StoredUser | null> => {
   if (!token) return null;
 
   try {
-    const user = await api.get<StoredUser>('auth/me', { auth: true });
-    return user;
+    const response = await api.get<MeApiResponse>('auth/me', { auth: true });
+    if (!response?.success || !response.data) {
+      throw new Error('No se pudo obtener el usuario');
+    }
+    const mapped = mapToStoredUser(response.data);
+    // Refresca el cache local sin tocar tokens
+    storeSession({
+      accessToken: token,
+      refreshToken: getRefreshToken() ?? undefined,
+      user: mapped,
+    });
+    return mapped;
   } catch {
     // Si falla la API, intenta devolver el usuario guardado para no romper la UI
     return getStoredUser();
@@ -120,13 +208,16 @@ export const refreshSession = async (): Promise<string | null> => {
   if (!refreshToken) return null;
 
   try {
-    const response = await api.post<LoginResponse>('/auth/refresh', {
+    const response = await api.post<LoginApiResponse>('/auth/refresh', {
       refreshToken,
     });
     // Reutiliza la preferencia de remember según dónde estaba guardado el refresh
-    const remember = !!localStorage.getItem(REFRESH_TOKEN_KEY);
-    storeSession(response, remember);
-    return response.accessToken;
+    if (!response?.success || !response.data?.token) {
+      throw new Error('No se pudo refrescar la sesión');
+    }
+    const normalized = normalizeLoginResponse(response.data);
+    storeSession(normalized);
+    return normalized.accessToken;
   } catch {
     clearStoredSession();
     return null;
