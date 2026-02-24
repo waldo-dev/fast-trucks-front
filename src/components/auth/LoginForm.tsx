@@ -20,7 +20,8 @@ export const LoginForm = () => {
     try {
       const sessionUser = await login(email, password, { remember: rememberMe });
       const role = sessionUser?.role?.toUpperCase();
-      const destination = role === 'ADMIN' ? '/admin' : '/';
+      const destination =
+        role === 'ADMIN' ? '/admin' : role === 'LOCAL_OPERATOR' ? '/pos' : '/';
       router.push(destination);
     } catch (err) {
       setError(

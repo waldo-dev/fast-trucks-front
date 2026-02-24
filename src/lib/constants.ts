@@ -91,3 +91,31 @@ export const ADMIN_SIDEBAR_ITEMS = [
   },
 ] as const;
 
+export const OPERATOR_SIDEBAR_ITEMS = [
+  {
+    title: 'Punto de Venta',
+    href: '/pos',
+    icon: 'storefront',
+  },
+  {
+    title: 'Pedidos Activos',
+    href: '/pos/pedidos-activos',
+    icon: 'shopping_bag',
+  },
+  {
+    title: 'Historial del Día',
+    href: '/pos/historial',
+    icon: 'history',
+  },
+  {
+    title: 'Cierre de Caja',
+    href: '/pos/cierre-caja',
+    icon: 'lock_open',
+  },
+  {
+    title: 'Cambiar Evento',
+    href: '/pos/cambiar-evento',
+    icon: 'event_repeat',
+  },
+] as const;
+
