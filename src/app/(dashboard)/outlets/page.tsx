@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { businessService } from '@/lib/services';
 import { OutletCard } from '@/components/outlets/OutletCard';
 import { OutletTabs } from '@/components/outlets/OutletTabs';
@@ -38,6 +39,14 @@ export default function OutletsPage() {
     secondary_color: '',
     logo: null as File | null,
   });
+
+  const outletsCount = outletsData.length;
+  const subtitle =
+    outletsCount === 0
+      ? 'Aún no tienes locales, crea el primero para comenzar.'
+      : outletsCount === 1
+      ? 'Tienes 1 local activo.'
+      : `Gestiona ${outletsCount} locales activos.`;
 
   const tabs = [
     { label: 'Todos los Locales', count: outletsData.length, id: 'all' },
@@ -84,6 +93,8 @@ export default function OutletsPage() {
     },
   ];
 
+  const router = useRouter();
+
   const handleEdit = (id: number) => {
     const outlet = outletsData.find((o) => o.id === id);
     if (!outlet) return;
@@ -105,6 +116,24 @@ export default function OutletsPage() {
 
   const handleAddOutlet = () => {
     setShowModal(true);
+  };
+
+  const handleViewDetail = (id: number) => {
+    router.push(`/outlets/${id}`);
+  };
+
+  const handleDelete = async (id: number) => {
+    const outlet = outletsData.find((o) => o.id === id);
+    const confirmDelete = window.confirm(
+      `¿Eliminar el local "${outlet?.name || id}"? Esta acción es irreversible.`
+    );
+    if (!confirmDelete) return;
+    try {
+      await businessService.remove(id);
+      await loadOutlets();
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -204,9 +233,7 @@ export default function OutletsPage() {
           <h1 className="text-[#181411] text-4xl font-extrabold tracking-tight">
             Gestionar Locales de Comida
           </h1>
-          <p className="text-[#8a7560] text-lg font-medium">
-            Centro de control y visión general para tus 12 ubicaciones activas.
-          </p>
+          <p className="text-[#8a7560] text-lg font-medium">{subtitle}</p>
         </div>
         <div className="flex gap-3">
           <button className="flex items-center gap-2 rounded-xl h-12 px-6 bg-white border border-[#e6e0db] text-[#181411] font-bold hover:bg-gray-50 transition-all shadow-sm">
@@ -252,6 +279,8 @@ export default function OutletsPage() {
               outlet={outlet}
               onEdit={() => handleEdit(outlet.id)}
               onToggleStatus={() => handleToggleStatus(outlet.id)}
+              onViewDetail={() => handleViewDetail(outlet.id)}
+              onDelete={() => handleDelete(outlet.id)}
             />
           ))}
         <AddOutletCard onClick={handleAddOutlet} />
@@ -261,8 +290,18 @@ export default function OutletsPage() {
       <StatsOverview stats={stats} />
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-          <div className="bg-white dark:bg-[#2d2419] border border-[#e6e0db] dark:border-[#3d3226] rounded-xl shadow-2xl max-w-3xl w-full p-6 relative">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
+          onClick={() => {
+            setShowModal(false);
+            setCreateError(null);
+            setCreateSuccess(null);
+          }}
+        >
+          <div
+            className="bg-white dark:bg-[#2d2419] border border-[#e6e0db] dark:border-[#3d3226] rounded-xl shadow-2xl max-w-3xl w-full p-6 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               className="absolute top-4 right-4 text-[#8a7560] hover:text-primary"
               onClick={() => {

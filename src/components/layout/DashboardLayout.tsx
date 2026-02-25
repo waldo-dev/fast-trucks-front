@@ -22,7 +22,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           <span className="material-symbols-outlined">menu</span>
         </button>
         <div className="flex-1 overflow-y-auto">
-          <div className="px-4 sm:px-6 lg:px-10 py-6 lg:py-10 space-y-8 w-full h-full">
+          <div className="px-6 sm:px-8 lg:px-10 py-6 lg:py-10 space-y-8 w-full h-full">
             {children}
           </div>
         </div>

@@ -155,19 +155,23 @@ export const productService = {
 
 export const promotionService = {
   list: (params?: { active?: boolean }) =>
-    api.get(`/promotions${qs(params)}`, { auth: true }),
-  get: (id: string | number) => api.get(`/promotions/${id}`, { auth: true }),
-  create: (data: unknown) => api.post("/promotions", data, { auth: true }),
+    api.get(`promotions${qs(params)}`, { auth: true }),
+  listByBusiness: (businessIds: Array<string | number>) =>
+    api.get(`promotions/by-business${qs({ business_ids: businessIds.join(",") })}`, {
+      auth: true,
+    }),
+  get: (id: string | number) => api.get(`promotions/${id}`, { auth: true }),
+  create: (data: unknown) => api.post("promotions", data, { auth: true }),
   update: (id: string | number, data: unknown) =>
-    api.put(`/promotions/${id}`, data, { auth: true }),
+    api.put(`promotions/${id}`, data, { auth: true }),
   toggleActive: (id: string | number, data: unknown) =>
-    api.post(`/promotions/${id}/active`, data, { auth: true }),
+    api.post(`promotions/${id}/active`, data, { auth: true }),
   addProducts: (id: string | number, data: unknown) =>
-    api.post(`/promotions/${id}/products`, data, { auth: true }),
+    api.post(`promotions/${id}/products`, data, { auth: true }),
   removeProducts: (id: string | number) =>
-    api.delete(`/promotions/${id}/products`, { auth: true }),
+    api.delete(`promotions/${id}/products`, { auth: true }),
   remove: (id: string | number) =>
-    api.delete(`/promotions/${id}`, { auth: true }),
+    api.delete(`promotions/${id}`, { auth: true }),
 };
 
 export const locationService = {

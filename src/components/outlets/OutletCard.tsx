@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface OutletCardProps {
   outlet: {
@@ -17,12 +17,16 @@ interface OutletCardProps {
   };
   onEdit: () => void;
   onToggleStatus: () => void;
+  onViewDetail?: () => void;
+  onDelete?: () => void;
 }
 
 export const OutletCard: React.FC<OutletCardProps> = ({
   outlet,
   onEdit,
   onToggleStatus,
+  onViewDetail,
+  onDelete,
 }) => {
   const typeColors = {
     Pizzeria: 'bg-primary/10 text-primary',
@@ -30,9 +34,11 @@ export const OutletCard: React.FC<OutletCardProps> = ({
     'Ghost Kitchen': 'bg-indigo-100 text-indigo-600',
   };
 
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <div className="bg-white rounded-2xl border border-[#e6e0db] p-5 shadow-sm hover:shadow-md transition-shadow group">
-      <div className="flex justify-between items-start mb-4">
+      <div className="flex justify-between items-start mb-4 relative">
         <div className="flex gap-4">
           <div className="size-16 rounded-xl bg-primary/5 flex items-center justify-center overflow-hidden">
             <img
@@ -65,9 +71,38 @@ export const OutletCard: React.FC<OutletCardProps> = ({
             </div>
           </div>
         </div>
-        <button className="text-[#8a7560] hover:text-primary transition-colors">
-          <span className="material-symbols-outlined">more_horiz</span>
-        </button>
+        <div className="relative">
+          <button
+            className="text-[#8a7560] hover:text-primary transition-colors"
+            onClick={() => setMenuOpen((o) => !o)}
+          >
+            <span className="material-symbols-outlined">more_horiz</span>
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 mt-2 w-40 bg-white border border-[#e6e0db] rounded-lg shadow-lg z-10">
+              <button
+                className="w-full text-left px-3 py-2 text-sm hover:bg-primary/5 flex items-center gap-2"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onViewDetail?.();
+                }}
+              >
+                <span className="material-symbols-outlined text-[18px]">visibility</span>
+                Ver detalle
+              </button>
+              <button
+                className="w-full text-left px-3 py-2 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onDelete?.();
+                }}
+              >
+                <span className="material-symbols-outlined text-[18px]">delete</span>
+                Eliminar
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 py-4 border-y border-[#f5f2f0] mb-4">
