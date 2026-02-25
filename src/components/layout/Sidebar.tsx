@@ -7,6 +7,9 @@ import {
   SIDEBAR_ITEMS,
   ADMIN_SIDEBAR_ITEMS,
   OPERATOR_SIDEBAR_ITEMS,
+  USERS_SIDEBAR_ITEM,
+  ADMIN_USERS_SIDEBAR_ITEM,
+  OWNER_ROLES,
   APP_NAME,
 } from '@/lib/constants';
 import { getCurrentUser, getCachedUser, logout } from '@/lib/auth';
@@ -23,7 +26,15 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
   const role = user?.role?.toUpperCase();
   const isAdmin = role === 'ADMIN';
   const isOperator = role === 'LOCAL_OPERATOR';
-  const sidebarItems = isAdmin ? ADMIN_SIDEBAR_ITEMS : isOperator ? OPERATOR_SIDEBAR_ITEMS : SIDEBAR_ITEMS;
+  const isOwner = role ? OWNER_ROLES.includes(role as (typeof OWNER_ROLES)[number]) : false;
+
+  const sidebarItems = isAdmin
+    ? [...ADMIN_SIDEBAR_ITEMS, ADMIN_USERS_SIDEBAR_ITEM]
+    : isOperator
+    ? OPERATOR_SIDEBAR_ITEMS
+    : isOwner
+    ? [...SIDEBAR_ITEMS, USERS_SIDEBAR_ITEM]
+    : SIDEBAR_ITEMS;
 
   useEffect(() => {
     let active = true;

@@ -11,6 +11,7 @@ interface ProductFiltersProps {
   onVenueChange: (venueId: string) => void;
   venues?: Array<{ id: string; name: string }>;
   categories?: Array<{ id: string; name: string; icon?: string; count?: number }>;
+  className?: string;
 }
 
 export const ProductFilters: React.FC<ProductFiltersProps> = ({
@@ -22,6 +23,7 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
   onVenueChange,
   venues,
   categories,
+  className,
 }) => {
   const normalizedVenues = venues && venues.length
     ? venues
@@ -51,7 +53,9 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
   };
 
   return (
-    <aside className="w-64 bg-white border-r border-primary/10 p-6 flex flex-col gap-8 overflow-y-auto scrollbar-hide">
+    <aside
+      className={`bg-white p-6 flex flex-col gap-8 overflow-y-auto scrollbar-hide ${className ?? ''}`}
+    >
       {/* Venue Filter */}
       <div>
         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">

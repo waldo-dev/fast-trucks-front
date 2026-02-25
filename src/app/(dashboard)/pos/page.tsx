@@ -1,123 +1,393 @@
 'use client';
 
-const categories = ['Todos', 'Comida', 'Bebidas', 'Postres'];
+import { useEffect, useMemo, useState } from 'react';
+import { businessService, eventService, productService } from '@/lib/services';
+import { getCachedUser } from '@/lib/auth';
 
-const productos = [
-  {
-    nombre: 'Hamburguesa Clásica',
-    precio: '$12.00',
-    imagen:
-      "url('https://lh3.googleusercontent.com/aida-public/AB6AXuBjYU4iB4Y8cutDkJYFGNu3DhDduEulJVwL_BS33QLf2nX9Z7f6vdMVle9AYefy5gAaDuqe_DYbR6tJQ3oGGMbX-1dR5eV0Nm9Bd4NFUWSY17WnRhzxP4vfwia3BA-bE1AZx1Jh9kBjLAK_Zk64KGlD8Ro17m0LFiss0UYGlO7gpWOiwu7sYVLkP5_3Tsq-32ub5GeGSOSe-MgzzJ3flJblarLy3vyQUo4aZqqkKcxpwxV5M86m0n8JUWhvCKOaYDEVJ1sJKMplxNE')",
-  },
-  {
-    nombre: 'Papas Fritas XL',
-    precio: '$5.50',
-    imagen:
-      "url('https://lh3.googleusercontent.com/aida-public/AB6AXuBKtReTQpSrPh92OAsDH1WciZHg4MOnW8buvAZp5ce5c9DEsqVDKPkVwYlDM07Hhooowl86UK-ZwwJsxi3RlFNp7-TkFYZvFQ8ASW7h_Bt8_U8zfMbHVkrFxKUK43JiS45iPr9HS9mLcsT8gro83SrYM3s_gJaIIXeSE1U-RNxshoCmaQufsKVsKs3PXmdoG1n_uvnQqlZ6A965QM0zPcP2uQ-1MsSthvo1gJDwcTysKucQNADD6UGuEI4c0HSvBdw3TN9Q-1tIsUY')",
-  },
-  {
-    nombre: 'Hot Dog Especial',
-    precio: '$8.00',
-    imagen:
-      "url('https://lh3.googleusercontent.com/aida-public/AB6AXuAWl5WD4lSDV_91PCX42s6sVu_9fZolbg77PaHCZmvVYOac1eK8MPYiQKb19OsMx_vO1nAXPRhVupcyypbUZLF-yYDQEAoJvzT_r5VfAnIF9LC36VISn2c6QTMs9yrefdWSaHJex23QrASXBBLeSSBfcp2wgkaX3rGHxKTXKPJoY9rpOaAxxjI1W4sgjcrNAEaRs-itkp00WPFpDAGolLKV-b1p1XMJvb6RPKm8Pj2ibHtCb5VW2_kIVz12cebOiV1MYxaUZN-4uxU')",
-  },
-  {
-    nombre: 'Refresco 500ml',
-    precio: '$3.00',
-    imagen:
-      "url('https://lh3.googleusercontent.com/aida-public/AB6AXuCgPGy1ehb2aniqqer7BUirX-oVFj0Biq84BcYVNllARlN4zRDY7mLBdputauJxG6DymkBziTny0ccZuJEO3tnIVCPYwkhMaWCfutwI3cJGeqpsEvSuuOp4iOL4JSxoQynY9W3Y7QlkeFamhP9k4Y1Xj4RYDI0fDUAseFyHuRF_Qop3-ocx4ipUHevDVQ-tbB_yKV69o6hhlYOb6LSgTIU3pTNphD2QakQfZvocSNHQ_JC55DFMT7OGwDTkp2NkzL8jn6AUwntS3Nk')",
-  },
-  {
-    nombre: 'Tacos al Pastor (3)',
-    precio: '$9.50',
-    imagen:
-      "url('https://lh3.googleusercontent.com/aida-public/AB6AXuCE-rcCaO4d9UUOrnXdAPXOWh8mYCdwWvTOMSDAjskQ6pmlimzib05dise_4W_dVJjha-r-_6_YDRLBu_hin1kM2m9lvMyFftBXtjaTL4aWasFKa9YxAV3yod9M2PrjyyPyZKscpL3ad4_3W_r1EAy7lLMGyCWOt83fuVvQhx1leEa_nZUfUDbTg4jjJXAx6NA_X4PdMnS4m65pQdBZaxOKZl9mY003Sz7eI_UZOtSRGTMuOfOKFc7s76UQgRbVz8WMEPx4ADA47WI')",
-  },
-  {
-    nombre: 'Cerveza Artesanal',
-    precio: '$7.00',
-    imagen:
-      "url('https://lh3.googleusercontent.com/aida-public/AB6AXuCt8_TYApRSkFBubSYMs8VsOUpUypXqNPjC-o8Fj3dCxx7PASR3t631uPV1NhFLhGqqOeu8jTkOsRwrN8O0AUYx1JrHeW_Yvg-MD1T930ETPWHCJRTxDY9HbjmgUhJbA-iL4RQdsfbobyuHPG2lF3GYUtYs_yNWKdYPLCKuB1sAq_ExV5EVwcO-9ueZWDDlWV6Ev4sVz9cdu2yaFdMdhz4geaKgIpXArwNviU-S632Ka0Ua0kspozfb0shG6gs1j-HlPE71pGpZw8c')",
-  },
-  {
-    nombre: 'Combo Familiar',
-    precio: '$25.00',
-    imagen:
-      "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDGOs-8x80sCwxSY-pKPF4gmaeDiZX3BLPI-dObEGR36XxgzEeGl-wosmq3B742CZ62ebnxwnuRDpIQdgUKBbjMBSQKHDVQZgveRh29IVBCrnjAqY8Z0pdw7tvXSdG-jWFz6zPvhK2zMVXRlCkMlm9inyQs-oJuHVO8eXFDPYiMcx6JAwep9u1YLlB9sAQdDinNoqoPJjMbdiD6mobbwAtT_ln0EllRr3SR_EVCHnzk6J6N6WpW7-QfJ-bF_R19yRmxabQJdHf3ORY')",
-  },
-];
+type UiProduct = {
+  id: string;
+  name: string;
+  price: string;
+  image: string;
+  category?: string;
+};
+
+type CartItem = UiProduct & { quantity: number; numericPrice: number };
 
 export default function PosPage() {
+  const [businesses, setBusinesses] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedBusiness, setSelectedBusiness] = useState<string>('');
+  const [events, setEvents] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedEvent, setSelectedEvent] = useState<string>('');
+  const [products, setProducts] = useState<UiProduct[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [eventMode, setEventMode] = useState(false);
+
+  const cachedBusinessId = getCachedUser()?.businessId;
+
+  const [selectedCategory, setSelectedCategory] = useState('Todos');
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    products.forEach((p) => {
+      if (p.category) set.add(p.category);
+    });
+    return ['Todos', ...Array.from(set)];
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    const term = search.toLowerCase();
+    return products.filter(
+      (p) =>
+        (!term || p.name.toLowerCase().includes(term)) &&
+        (selectedCategory === 'Todos' || p.category === selectedCategory)
+    );
+  }, [products, search, selectedCategory]);
+
+  useEffect(() => {
+    const loadBasics = async () => {
+      try {
+        const resp = await businessService.list();
+        const list = (resp as any)?.data ?? resp;
+        const mapped =
+          Array.isArray(list) && list.length
+            ? list.map((b: any) => ({
+                id: String(b.id),
+                name: b.name || b.brand_name || 'Sin nombre',
+              }))
+            : [];
+        setBusinesses(mapped);
+        if (mapped.length === 1) {
+          setSelectedBusiness(mapped[0].id);
+        } else if (cachedBusinessId) {
+          const found = mapped.find((b) => b.id === String(cachedBusinessId));
+          if (found) setSelectedBusiness(found.id);
+        }
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'No se pudieron cargar los locales'
+        );
+      }
+    };
+
+    const loadEvents = async () => {
+      try {
+        const resp = await eventService.list({ future: true });
+        const list = (resp as any)?.data ?? resp;
+        if (Array.isArray(list)) {
+          setEvents(
+            list.map((ev: any) => ({
+              id: String(ev.id),
+              name: ev.name || ev.title || 'Evento',
+            }))
+          );
+        }
+      } catch {
+        setEvents([]);
+      }
+    };
+
+    loadBasics();
+    loadEvents();
+  }, [cachedBusinessId]);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      if (!selectedBusiness) {
+        setProducts([]);
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await productService.listByOwner({ business_id: selectedBusiness });
+        const list = (resp as any)?.data ?? resp;
+        if (Array.isArray(list)) {
+          setProducts(
+            list.map((p: any) => ({
+              id: String(p.id ?? Math.random().toString(36).slice(2)),
+              name: p.name || 'Sin nombre',
+              price: p.price ? `$${p.price}` : '$0.00',
+              image:
+                p.image ||
+                'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=800&q=80',
+              category: p.category?.name || 'Sin categoría',
+            }))
+          );
+        } else {
+          setProducts([]);
+        }
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'No se pudieron cargar los productos'
+        );
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProducts();
+  }, [selectedBusiness]);
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4 lg:gap-6">
       {/* Encabezado */}
-      <header className="bg-[#2a1e1a] text-slate-100 rounded-2xl p-5 border border-[#3d2a24]/60 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-lg shadow-black/10">
-        <div className="flex items-center gap-3">
-          <div className="bg-[#ec4913]/20 p-2 rounded-lg">
-            <span className="material-symbols-outlined text-[#ec4913]">confirmation_number</span>
+      <header className="bg-white border border-primary/10 rounded-2xl p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="bg-primary/10 text-primary p-2 rounded-lg">
+            <span className="material-symbols-outlined">storefront</span>
           </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-[#ec4913] font-semibold">Evento activo</p>
-            <h1 className="text-xl md:text-2xl font-bold leading-tight">Festival Gastronómico 2024</h1>
+          <div className="flex flex-col gap-2 w-full">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs uppercase tracking-[0.18em] text-primary font-semibold">
+                Punto de venta
+              </p>
+              <div className="text-xs text-gray-500">
+                {selectedBusiness ? 'Local seleccionado' : 'Selecciona un local'}
+              </div>
+            </div>
+            <div className="flex flex-col xl:flex-row xl:items-center xl:gap-3 gap-2">
+              <select
+                className="bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 outline-none w-full xl:w-64"
+                value={selectedBusiness}
+                onChange={(e) => setSelectedBusiness(e.target.value)}
+              >
+                <option value="">{businesses.length > 0 ? 'Selecciona un local' : 'Sin locales'}</option>
+                {businesses.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="accent-primary"
+                    checked={eventMode}
+                    onChange={(e) => {
+                      const enabled = e.target.checked;
+                      setEventMode(enabled);
+                      if (!enabled) setSelectedEvent('');
+                    }}
+                  />
+                  POS en evento
+                </label>
+                {events.length > 0 && (
+                  <select
+                    className="bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 outline-none w-full sm:w-56 disabled:opacity-50 disabled:cursor-not-allowed"
+                    value={selectedEvent}
+                    onChange={(e) => {
+                      setSelectedEvent(e.target.value);
+                      setEventMode(true);
+                    }}
+                    disabled={!eventMode}
+                  >
+                    <option value="">Selecciona evento</option>
+                    {events.map((ev) => (
+                      <option key={ev.id} value={ev.id}>
+                        {ev.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto">
           <div className="relative flex-1 md:w-72">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
               search
             </span>
             <input
-              className="w-full bg-[#3d2a24]/70 border-none rounded-xl pl-10 pr-4 py-2 text-slate-100 placeholder:text-slate-500 focus:ring-1 focus:ring-[#ec4913]"
+              className="w-full bg-background-light border border-primary/20 rounded-xl pl-10 pr-4 py-2 text-gray-800 placeholder:text-gray-400 focus:ring-2 focus:ring-primary/20 focus:bg-white"
               placeholder="Buscar producto..."
               type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <button className="bg-[#3d2a24] text-slate-100 p-2 rounded-lg">
+          <button className="hidden sm:inline-flex bg-white border border-primary/20 text-gray-600 p-2 rounded-lg hover:bg-primary/5">
             <span className="material-symbols-outlined">notifications</span>
           </button>
-          <button className="bg-[#3d2a24] text-slate-100 p-2 rounded-lg">
+          <button className="hidden sm:inline-flex bg-white border border-primary/20 text-gray-600 p-2 rounded-lg hover:bg-primary/5">
             <span className="material-symbols-outlined">settings</span>
           </button>
         </div>
       </header>
 
-      {/* Categorías */}
-      <div className="flex gap-3 flex-wrap">
-        {categories.map((cat, idx) => (
-          <button
-            key={cat}
-            className={`px-5 py-2 rounded-xl font-bold text-sm ${
-              idx === 0
-                ? 'bg-[#ec4913] text-white'
-                : 'bg-[#3d2a24] text-slate-200 hover:bg-[#3d2a24]/80'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
-
-      {/* Productos */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-        {productos.map((prod) => (
-          <div
-            key={prod.nombre}
-            className="bg-[#2a1e1a] rounded-xl overflow-hidden flex flex-col border border-[#3d2a24]/60 hover:border-[#ec4913]/60 transition-colors group cursor-pointer shadow-md shadow-black/10"
-          >
-            <div
-              className="aspect-square w-full bg-cover bg-center"
-              style={{ backgroundImage: prod.imagen }}
-              aria-hidden
-            />
-            <div className="p-4 flex flex-col gap-2 relative">
-              <h3 className="font-bold text-lg text-slate-100 leading-tight">{prod.nombre}</h3>
-              <p className="text-[#ec4913] font-bold text-xl">{prod.precio}</p>
-              <button className="absolute bottom-4 right-4 bg-[#ec4913] text-white size-11 rounded-full flex items-center justify-center shadow-lg shadow-[#ec4913]/30 group-active:scale-95 transition-transform">
-                <span className="material-symbols-outlined font-bold">add</span>
+      {/* Contenido principal responsive */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 lg:gap-6">
+        <div className="xl:col-span-2 flex flex-col gap-4">
+          {/* Categorías */}
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap border ${
+                  selectedCategory === cat
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-white text-gray-700 border-primary/20 hover:bg-primary/5'
+                }`}
+                onClick={() => setSelectedCategory(cat)}
+              >
+                {cat}
               </button>
-            </div>
+            ))}
           </div>
-        ))}
+
+          {/* Productos */}
+          {loading ? (
+            <div className="text-gray-600 text-sm bg-white border border-primary/10 rounded-xl p-4">
+              Cargando productos...
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="text-gray-600 text-sm bg-white border border-dashed border-primary/20 rounded-xl p-4">
+              {selectedBusiness
+                ? 'No hay productos para este local.'
+                : 'Selecciona un local para ver productos.'}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+              {filteredProducts.map((prod) => (
+                <div
+                  key={prod.id}
+                  className="bg-white rounded-xl overflow-hidden flex flex-col border border-primary/10 hover:border-primary/30 transition-colors shadow-sm"
+                >
+                  <div
+                    className="aspect-square w-full bg-cover bg-center"
+                    style={{ backgroundImage: `url('${prod.image}')` }}
+                    aria-hidden
+                  />
+                  <div className="p-4 flex flex-col gap-2 relative">
+                    <h3 className="font-bold text-base text-gray-900 leading-tight">{prod.name}</h3>
+                    {prod.category && (
+                      <span className="text-xs text-gray-500 uppercase tracking-[0.12em]">
+                        {prod.category}
+                      </span>
+                    )}
+                    <p className="text-primary font-bold text-lg">{prod.price}</p>
+                    <button
+                      className="absolute bottom-4 right-4 bg-primary text-white size-10 rounded-full flex items-center justify-center shadow-lg shadow-primary/30 active:scale-95 transition-transform"
+                      onClick={() => {
+                        const numericPrice = Number(String(prod.price).replace(/[^0-9.]/g, '')) || 0;
+                        setCart((prev) => {
+                          const existing = prev.find((p) => p.id === prod.id);
+                          if (existing) {
+                            return prev.map((p) =>
+                              p.id === prod.id ? { ...p, quantity: p.quantity + 1 } : p
+                            );
+                          }
+                          return [...prev, { ...prod, quantity: 1, numericPrice }];
+                        });
+                      }}
+                    >
+                      <span className="material-symbols-outlined font-bold text-base">add</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Resumen de orden */}
+        <div className="bg-white border border-primary/10 rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">receipt_long</span>
+              <h3 className="font-bold text-gray-900">Orden actual</h3>
+            </div>
+            <span className="text-xs text-gray-500">
+              {cart.reduce((acc, item) => acc + item.quantity, 0)} ítems
+            </span>
+          </div>
+
+          {cart.length === 0 ? (
+            <p className="text-sm text-gray-500">Aún no has agregado productos.</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
+                {cart.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-3 bg-background-light rounded-lg p-2 border border-primary/10"
+                  >
+                    <div
+                      className="size-12 rounded-md bg-cover bg-center border border-primary/10"
+                      style={{ backgroundImage: `url('${item.image}')` }}
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-gray-900">{item.name}</p>
+                      <p className="text-xs text-gray-500">{item.category || 'Sin categoría'}</p>
+                      <p className="text-primary font-bold">{item.price}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="size-8 rounded-full bg-white border border-primary/20 text-primary flex items-center justify-center hover:bg-primary/5"
+                        onClick={() =>
+                          setCart((prev) =>
+                            prev
+                              .map((p) =>
+                                p.id === item.id
+                                  ? { ...p, quantity: Math.max(0, p.quantity - 1) }
+                                  : p
+                              )
+                              .filter((p) => p.quantity > 0)
+                          )
+                        }
+                      >
+                        <span className="material-symbols-outlined text-base">remove</span>
+                      </button>
+                      <span className="w-6 text-center text-sm font-semibold">{item.quantity}</span>
+                      <button
+                        className="size-8 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90"
+                        onClick={() =>
+                          setCart((prev) =>
+                            prev.map((p) =>
+                              p.id === item.id ? { ...p, quantity: p.quantity + 1 } : p
+                            )
+                          )
+                        }
+                      >
+                        <span className="material-symbols-outlined text-base">add</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between text-sm font-semibold text-gray-800">
+                <span>Total</span>
+                <span className="text-primary text-lg">
+                  $
+                  {cart
+                    .reduce((acc, item) => acc + item.numericPrice * item.quantity, 0)
+                    .toFixed(2)}
+                </span>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  className="flex-1 bg-primary text-white rounded-lg py-3 font-bold hover:bg-primary/90 transition-colors"
+                >
+                  Continuar
+                </button>
+                <button
+                  className="px-4 py-3 rounded-lg border border-primary/20 text-gray-700 hover:bg-primary/5"
+                  onClick={() => setCart([])}
+                >
+                  Vaciar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

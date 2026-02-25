@@ -59,12 +59,16 @@ export const businessService = {
 };
 
 export const userService = {
-  list: () => api.get("/users", { auth: true }),
-  get: (id: string | number) => api.get(`/users/${id}`, { auth: true }),
-  create: (data: unknown) => api.post("/users", data, { auth: true }),
+  list: () => api.get("users", { auth: true }),
+  listByBusiness: (businessId: string | number) =>
+    api.get(`users/business/${businessId}`, { auth: true }),
+  listAdminsOwners: (params?: { business_id?: string | number }) =>
+    api.get(`users/admins-owners${qs(params)}`, { auth: true }),
+  get: (id: string | number) => api.get(`users/${id}`, { auth: true }),
+  create: (data: unknown) => api.post("users", data, { auth: true }),
   update: (id: string | number, data: unknown) =>
-    api.put(`/users/${id}`, data, { auth: true }),
-  remove: (id: string | number) => api.delete(`/users/${id}`, { auth: true }),
+    api.put(`users/${id}`, data, { auth: true }),
+  remove: (id: string | number) => api.delete(`users/${id}`, { auth: true }),
 };
 
 export const categoryService = {

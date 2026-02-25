@@ -44,6 +44,7 @@ export default function ProductsPage() {
     image: null as File | null,
   });
   const [productVenues, setProductVenues] = useState<string[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const loadCategories = async () => {
     try {
@@ -166,35 +167,35 @@ export default function ProductsPage() {
   }, [selectedVenue, selectedCategory, selectedStatus]);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden bg-background-light">
       {/* Top Header */}
-      <header className="h-16 bg-white border-b border-primary/10 flex items-center justify-between px-8 shrink-0">
-        <div className="flex items-center gap-2 text-sm">
+      <header className="bg-white border-b border-primary/10 px-4 sm:px-6 lg:px-8 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0">
+        <div className="flex items-center gap-2 text-sm text-gray-500">
           <span className="text-gray-400">Global</span>
           <span className="material-symbols-outlined text-[16px] text-gray-300">chevron_right</span>
-          <span className="font-semibold">Productos</span>
+          <span className="font-semibold text-[#181411]">Productos</span>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="relative group">
+        <div className="w-full sm:w-auto flex flex-wrap items-center gap-2 sm:gap-3 justify-end">
+          <div className="relative group w-full sm:w-64">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors">
               search
             </span>
             <input
-              className="pl-10 pr-4 py-2 bg-background-light border-none rounded-lg text-sm w-64 focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
+              className="pl-10 pr-4 py-2 bg-background-light border border-transparent rounded-lg text-sm w-full focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all"
               placeholder="Buscar producto o SKU..."
               type="text"
             />
           </div>
           <button
             onClick={handleAddProduct}
-            className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg text-sm font-bold transition-transform active:scale-95 shadow-lg shadow-primary/20"
+            className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-transform active:scale-95 shadow-lg shadow-primary/20 w-full sm:w-auto justify-center"
           >
             <span className="material-symbols-outlined text-[20px]">add</span>
-            Agregar Nuevo Producto
+            Agregar Producto
           </button>
           <button
             onClick={() => setShowCategoryModal(true)}
-            className="flex items-center gap-2 bg-white text-primary border border-primary/30 hover:bg-primary/5 px-4 py-2 rounded-lg text-sm font-bold transition-transform active:scale-95 shadow-sm"
+            className="flex items-center gap-2 bg-white text-primary border border-primary/30 hover:bg-primary/5 px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-transform active:scale-95 shadow-sm w-full sm:w-auto justify-center"
           >
             <span className="material-symbols-outlined text-[20px]">category</span>
             Nueva Categoría
@@ -202,30 +203,40 @@ export default function ProductsPage() {
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Filters Sidebar */}
-        <ProductFilters
-          selectedCategory={selectedCategory}
-          onCategoryChange={setSelectedCategory}
-          selectedStatus={selectedStatus}
-          onStatusChange={setSelectedStatus}
-          selectedVenue={selectedVenue}
-          onVenueChange={setSelectedVenue}
-          venues={venues}
-          categories={categories}
-        />
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* Filters Sidebar Desktop */}
+        <div className="hidden lg:block w-72 shrink-0 border-r border-primary/10 bg-white">
+          <ProductFilters
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+            selectedStatus={selectedStatus}
+            onStatusChange={setSelectedStatus}
+            selectedVenue={selectedVenue}
+            onVenueChange={setSelectedVenue}
+            venues={venues}
+            categories={categories}
+            className="w-full h-full"
+          />
+        </div>
 
         {/* Data Content */}
-        <div className="flex-1 p-8 overflow-y-auto bg-background-light">
+        <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
           <div className="flex flex-col gap-6">
-            <div className="flex items-end justify-between">
-              <div>
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div className="space-y-1">
                 <h2 className="text-2xl font-black text-[#181411]">Catálogo Global de Productos</h2>
-                <p className="text-gray-500 text-sm mt-1">
+                <p className="text-gray-500 text-sm">
                   Gestiona 59 productos en 4 locales activos.
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setFiltersOpen(true)}
+                  className="lg:hidden flex items-center gap-2 px-3 py-2 rounded-lg border border-primary/30 text-sm font-semibold text-primary bg-white hover:bg-primary/5 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px]">filter_alt</span>
+                  Filtros
+                </button>
                 <button
                   onClick={handleExport}
                   className="p-2 bg-white border border-primary/10 rounded-lg hover:bg-primary/5 transition-colors"
@@ -247,22 +258,24 @@ export default function ProductsPage() {
                 Cargando productos...
               </div>
             ) : products.length === 0 ? (
-              <div className="bg-white border border-dashed border-primary/20 rounded-xl p-6 text-sm text-gray-500 flex items-center justify-between">
+              <div className="bg-white border border-dashed border-primary/20 rounded-xl p-6 text-sm text-gray-500 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <span>No hay productos disponibles.</span>
                 <button
                   onClick={handleAddProduct}
-                  className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg text-sm font-bold transition-transform active:scale-95 shadow-lg shadow-primary/20"
+                  className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg text-sm font-bold transition-transform active:scale-95 shadow-lg shadow-primary/20 w-full sm:w-auto justify-center"
                 >
                   <span className="material-symbols-outlined text-[20px]">add</span>
                   Agregar producto
                 </button>
               </div>
             ) : (
-              <ProductTable
-                products={products}
-                onEdit={handleEdit}
-                onViewDetails={handleViewDetails}
-              />
+              <div className="bg-white border border-primary/10 rounded-xl p-0">
+                <ProductTable
+                  products={products}
+                  onEdit={handleEdit}
+                  onViewDetails={handleViewDetails}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -660,6 +673,31 @@ export default function ProductsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {filtersOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center px-4">
+          <div className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-md max-h-[80vh] overflow-hidden relative">
+            <button
+              className="absolute top-3 right-3 text-gray-500 hover:text-primary"
+              onClick={() => setFiltersOpen(false)}
+              aria-label="Cerrar filtros"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+            <ProductFilters
+              selectedCategory={selectedCategory}
+              onCategoryChange={setSelectedCategory}
+              selectedStatus={selectedStatus}
+              onStatusChange={setSelectedStatus}
+              selectedVenue={selectedVenue}
+              onVenueChange={setSelectedVenue}
+              venues={venues}
+              categories={categories}
+              className="w-full h-[80vh] max-h-[80vh] border-0"
+            />
           </div>
         </div>
       )}

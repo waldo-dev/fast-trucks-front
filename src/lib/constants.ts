@@ -48,6 +48,12 @@ export const SIDEBAR_ITEMS = [
   },
 ] as const;
 
+export const USERS_SIDEBAR_ITEM = {
+  title: 'Usuarios',
+  href: '/users',
+  icon: 'group',
+} as const;
+
 export const ADMIN_SIDEBAR_ITEMS = [
   {
     title: 'Resumen Global',
@@ -91,6 +97,12 @@ export const ADMIN_SIDEBAR_ITEMS = [
   },
 ] as const;
 
+export const ADMIN_USERS_SIDEBAR_ITEM = {
+  title: 'Usuarios',
+  href: '/admin/usuarios',
+  icon: 'group',
+} as const;
+
 export const OPERATOR_SIDEBAR_ITEMS = [
   {
     title: 'Punto de Venta',
@@ -118,4 +130,6 @@ export const OPERATOR_SIDEBAR_ITEMS = [
     icon: 'event_repeat',
   },
 ] as const;
+
+export const OWNER_ROLES = ['OWNER', 'BUSINESS_OWNER', 'OWNER_BUSINESS'] as const;
 
