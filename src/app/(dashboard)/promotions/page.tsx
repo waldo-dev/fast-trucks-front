@@ -9,11 +9,14 @@ type Promotion = {
   type?: string;
   amount?: number;
   percentage?: number;
+  discount_value?: number;
   status?: 'draft' | 'active' | 'expired' | string;
   starts_at?: string;
   ends_at?: string;
   business_ids?: Array<string | number>;
   product_ids?: Array<string | number>;
+  businesses?: Array<{ id: string | number; name: string }>;
+  products?: Array<{ id: string | number; name: string }>;
 };
 
 const statusBadge = (status?: string) => {
@@ -427,7 +430,7 @@ export default function PromotionsPage() {
                                   name: p.name || '',
                                   description: '',
                                   discount_type: (p.type || 'PERCENTAGE').toString().toUpperCase(),
-                                  discount_value: p.percentage || p.amount || '',
+                                  discount_value: String(p.percentage ?? p.amount ?? p.discount_value ?? ''),
                                   start_date: p.starts_at || '',
                                   end_date: p.ends_at || '',
                                   active: (p.status || '').toLowerCase() === 'active',
