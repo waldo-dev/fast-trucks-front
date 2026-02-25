@@ -7,6 +7,10 @@ interface ProductFiltersProps {
   onCategoryChange: (category: string) => void;
   selectedStatus: string;
   onStatusChange: (status: string) => void;
+  selectedVenue: string;
+  onVenueChange: (venueId: string) => void;
+  venues?: Array<{ id: string; name: string }>;
+  categories?: Array<{ id: string; name: string; icon?: string; count?: number }>;
 }
 
 export const ProductFilters: React.FC<ProductFiltersProps> = ({
@@ -14,22 +18,27 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
   onCategoryChange,
   selectedStatus,
   onStatusChange,
+  selectedVenue,
+  onVenueChange,
+  venues,
+  categories,
 }) => {
-  const [selectedVenues, setSelectedVenues] = useState<string[]>(['all']);
+  const normalizedVenues = venues && venues.length
+    ? venues
+    : [
+        { id: '', name: 'Todos los Locales' },
+      ];
 
-  const venues = [
-    { id: 'all', name: 'Todos los Locales' },
-    { id: 'downtown', name: 'Pizzería Centro' },
-    { id: 'brooklyn', name: 'Brooklyn Truck' },
-    { id: 'station', name: 'Station Express' },
-  ];
-
-  const categories = [
-    { id: 'pizza', name: 'Pizza', icon: 'local_pizza', count: 24 },
-    { id: 'burgers', name: 'Hamburguesas', icon: 'lunch_dining', count: 12 },
-    { id: 'sides', name: 'Acompañamientos', icon: 'fastfood', count: 8 },
-    { id: 'drinks', name: 'Bebidas', icon: 'local_bar', count: 15 },
-  ];
+  const normalizedCategories =
+    categories && categories.length
+      ? categories
+      : [
+          { id: '', name: 'Todas', icon: 'category', count: undefined },
+          { id: 'pizza', name: 'Pizza', icon: 'local_pizza', count: 24 },
+          { id: 'burgers', name: 'Hamburguesas', icon: 'lunch_dining', count: 12 },
+          { id: 'sides', name: 'Acompañamientos', icon: 'fastfood', count: 8 },
+          { id: 'drinks', name: 'Bebidas', icon: 'local_bar', count: 15 },
+        ];
 
   const statuses = [
     { id: 'active', name: 'Activo', active: selectedStatus === 'active' },
@@ -37,17 +46,8 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
     { id: 'draft', name: 'Borrador', active: selectedStatus === 'draft' },
   ];
 
-  const handleVenueToggle = (venueId: string) => {
-    if (venueId === 'all') {
-      setSelectedVenues(['all']);
-    } else {
-      setSelectedVenues((prev) => {
-        const filtered = prev.filter((id) => id !== 'all');
-        return filtered.includes(venueId)
-          ? filtered.filter((id) => id !== venueId)
-          : [...filtered, venueId];
-      });
-    }
+  const handleVenueSelect = (venueId: string) => {
+    onVenueChange(venueId);
   };
 
   return (
@@ -58,16 +58,17 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
           Por Local
         </h3>
         <div className="space-y-3">
-          {venues.map((venue) => (
+          {normalizedVenues.map((venue) => (
             <label
               key={venue.id}
               className="flex items-center gap-3 cursor-pointer group"
             >
               <input
-                checked={selectedVenues.includes(venue.id)}
+                checked={selectedVenue === venue.id}
                 className="rounded border-gray-300 text-primary focus:ring-primary size-4"
-                type="checkbox"
-                onChange={() => handleVenueToggle(venue.id)}
+                type="radio"
+                name="venue"
+                onChange={() => handleVenueSelect(venue.id)}
               />
               <span className="text-sm font-medium text-gray-600 group-hover:text-primary transition-colors">
                 {venue.name}
@@ -83,7 +84,7 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
           Categorías
         </h3>
         <div className="space-y-1">
-          {categories.map((category) => {
+          {normalizedCategories.map((category) => {
             const isActive = selectedCategory === category.id;
             return (
               <button

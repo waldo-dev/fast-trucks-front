@@ -75,13 +75,28 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
               {isAdmin ? 'Panel Admin Global' : isOperator ? 'Terminal POS' : 'Panel Administrador'}
             </p>
           </div>
-          <button
-            className="lg:hidden p-2 rounded-lg hover:bg-primary/10 text-[#8a7560] transition-colors"
-            onClick={onClose}
-            aria-label="Cerrar menú"
-          >
-            <span className="material-symbols-outlined">close</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              className="p-2 rounded-lg hover:bg-primary/10 text-[#8a7560] transition-colors relative"
+              aria-label="Alertas"
+            >
+              <span className="material-symbols-outlined">notifications</span>
+              <span className="absolute top-1 right-1 size-2 bg-red-500 rounded-full border-2 border-white"></span>
+            </button>
+            <button
+              className="p-2 rounded-lg hover:bg-primary/10 text-[#8a7560] transition-colors"
+              aria-label="Configuración"
+            >
+              <span className="material-symbols-outlined">settings</span>
+            </button>
+            <button
+              className="lg:hidden p-2 rounded-lg hover:bg-primary/10 text-[#8a7560] transition-colors"
+              onClick={onClose}
+              aria-label="Cerrar menú"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">

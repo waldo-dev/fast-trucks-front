@@ -34,13 +34,16 @@ class ApiClient {
 
     const { auth, headers, ...restOptions } = options;
     const token = auth ? this.getStoredToken() : null;
+    const isFormData =
+      typeof FormData !== 'undefined' &&
+      restOptions.body instanceof FormData;
 
     try {
       const response = await fetch(url, {
         ...restOptions,
         signal: controller.signal,
         headers: {
-          'Content-Type': 'application/json',
+          ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
           ...headers,
         },
@@ -82,6 +85,18 @@ class ApiClient {
     });
   }
 
+  async postForm<T>(
+    endpoint: string,
+    formData: FormData,
+    options: ApiRequestOptions = {}
+  ): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      body: formData,
+      ...options,
+    });
+  }
+
   async put<T>(
     endpoint: string,
     data: unknown,
@@ -90,6 +105,18 @@ class ApiClient {
     return this.request<T>(endpoint, {
       method: 'PUT',
       body: JSON.stringify(data),
+      ...options,
+    });
+  }
+
+  async putForm<T>(
+    endpoint: string,
+    formData: FormData,
+    options: ApiRequestOptions = {}
+  ): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'PUT',
+      body: formData,
       ...options,
     });
   }
