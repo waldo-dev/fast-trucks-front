@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { login } from '@/lib/auth';
 
@@ -39,7 +40,14 @@ export const LoginForm = () => {
       {/* Mobile Branding */}
       <div className="flex items-center gap-2 mb-10 md:hidden">
         <div className="bg-primary p-1.5 rounded-lg text-white">
-          <span className="material-symbols-outlined text-2xl">restaurant</span>
+          <Image
+            src="/logo-blanco-sinfondo.png"
+            alt="Operfoods"
+            width={32}
+            height={32}
+            className="rounded-md"
+            priority
+          />
         </div>
         <span className="text-[#181411] dark:text-white text-xl font-bold tracking-tight">
         Operfoods
@@ -48,7 +56,7 @@ export const LoginForm = () => {
 
       <div className="mb-10">
         <h2 className="text-3xl font-extrabold text-[#181411] dark:text-white mb-2">
-          ¡Bienvenido de nuevo, Chef!
+          ¡Bienvenido de nuevo a Operfoods!
         </h2>
         <p className="text-[#8a7560] dark:text-[#a09080]">
           Ingresa tus credenciales para acceder a tu panel
@@ -162,7 +170,7 @@ export const LoginForm = () => {
 
       {/* Subtle Brand Footer */}
       <div className="mt-auto pt-10 flex justify-center items-center gap-4 text-[#8a7560] text-[10px] uppercase tracking-[0.2em]">
-        <span>© 2024 Chilsmart Inc.</span>
+        <span>© 2024 Chilsmart SPA.</span>
         <span className="h-1 w-1 rounded-full bg-[#8a7560]"></span>
         <a className="hover:text-primary transition-colors" href="#">
           Política de Privacidad

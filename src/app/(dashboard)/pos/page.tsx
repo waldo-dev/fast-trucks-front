@@ -1,13 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { businessService, eventService, productService } from '@/lib/services';
+import { businessService, eventService, productService, orderService } from '@/lib/services';
+import { config } from '@/lib/config';
 import { getCachedUser } from '@/lib/auth';
+import { toast } from 'react-toastify';
 
 type UiProduct = {
   id: string;
   name: string;
   price: string;
+  numericPrice: number;
+  numericProductId: number | null;
   image: string;
   category?: string;
 };
@@ -25,6 +29,12 @@ export default function PosPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [eventMode, setEventMode] = useState(false);
+  const [customer, setCustomer] = useState({ name: '', phone: '', email: '' });
+  const [orderType, setOrderType] = useState<'pickup' | 'delivery'>('pickup');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [submittingOrder, setSubmittingOrder] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const cachedBusinessId = getCachedUser()?.businessId;
 
@@ -46,6 +56,109 @@ export default function PosPage() {
         (selectedCategory === 'Todos' || p.category === selectedCategory)
     );
   }, [products, search, selectedCategory]);
+
+  const formatClp = (value: number) =>
+    new Intl.NumberFormat('es-CL', {
+      style: 'currency',
+      currency: 'CLP',
+      maximumFractionDigits: 0,
+    }).format(value || 0);
+
+  const resolveImageUrl = (url?: string | null) => {
+    const fallback =
+      'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=800&q=80';
+    if (!url) return fallback;
+    if (/^https?:\/\//i.test(url)) return url;
+    const base = config.api.baseUrl.replace(/\/$/, '');
+    const path = url.startsWith('/') ? url.slice(1) : url;
+    return `${base}/${path}`;
+  };
+
+  const canCheckout =
+    cart.length > 0 &&
+    customer.name.trim() !== '' &&
+    customer.phone.trim() !== '' &&
+    (orderType === 'pickup' || deliveryAddress.trim() !== '');
+
+  const handleCreateOrder = async () => {
+    setError(null);
+    setConfirmOpen(false);
+    try {
+      setSubmittingOrder(true);
+      const items: Array<{ product_id: number; quantity: number; unit_price: number }> = [];
+      for (const item of cart) {
+        const rawId = item.numericProductId ?? item.id;
+        const productId = Number(rawId);
+        if (!Number.isFinite(productId)) {
+          const msg = 'Hay productos sin ID numérico válido; revisa el catálogo.';
+          setError(msg);
+          toast.error(msg);
+          setSubmittingOrder(false);
+          return;
+        }
+        items.push({
+          product_id: productId,
+          quantity: item.quantity,
+          unit_price: item.numericPrice,
+        });
+      }
+
+      const payload: any = {
+        business_id: selectedBusiness,
+        event_id: eventMode && selectedEvent ? selectedEvent : undefined,
+        order_type: orderType === 'delivery' ? 'DELIVERY' : 'PICKUP',
+        order_source: 'WHATSAPP',
+        items,
+        customer: {
+          name: customer.name.trim(),
+          phone: customer.phone.trim(),
+          email: customer.email.trim() || undefined,
+          notes: orderType === 'delivery' ? deliveryNotes.trim() || undefined : undefined,
+          address:
+            orderType === 'delivery'
+              ? {
+                  address: deliveryAddress.trim(),
+                  notes: deliveryNotes.trim() || undefined,
+                }
+              : undefined,
+        },
+      };
+
+      await toast.promise(orderService.create(payload), {
+        pending: 'Creando orden...',
+        success: 'Orden creada correctamente',
+        error: 'No se pudo crear la orden',
+      });
+
+      setCart([]);
+      setCustomer({ name: '', phone: '', email: '' });
+      setDeliveryAddress('');
+      setDeliveryNotes('');
+      setOrderType('pickup');
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'No se pudo crear la orden. Intenta nuevamente.';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setSubmittingOrder(false);
+    }
+  };
+
+  const handleContinue = () => {
+    if (!canCheckout) {
+      setError(
+        orderType === 'delivery'
+          ? 'Completa nombre, teléfono y dirección para continuar.'
+          : 'Completa nombre y teléfono del cliente para continuar.'
+      );
+      return;
+    }
+    setError(null);
+    setConfirmOpen(true);
+  };
 
   useEffect(() => {
     const loadBasics = async () => {
@@ -110,10 +223,13 @@ export default function PosPage() {
             list.map((p: any) => ({
               id: String(p.id ?? Math.random().toString(36).slice(2)),
               name: p.name || 'Sin nombre',
-              price: p.price ? `$${p.price}` : '$0.00',
-              image:
-                p.image ||
-                'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=800&q=80',
+              numericPrice: Number(p.price) || 0,
+              numericProductId:
+                p.id !== undefined && Number.isFinite(Number(p.id))
+                  ? Number(p.id)
+                  : null,
+              price: formatClp(Number(p.price) || 0),
+              image: resolveImageUrl(p.image || p.image_url),
               category: p.category?.name || 'Sin categoría',
             }))
           );
@@ -275,7 +391,7 @@ export default function PosPage() {
                     <button
                       className="absolute bottom-4 right-4 bg-primary text-white size-10 rounded-full flex items-center justify-center shadow-lg shadow-primary/30 active:scale-95 transition-transform"
                       onClick={() => {
-                        const numericPrice = Number(String(prod.price).replace(/[^0-9.]/g, '')) || 0;
+                        const numericPrice = prod.numericPrice || 0;
                         setCart((prev) => {
                           const existing = prev.find((p) => p.id === prod.id);
                           if (existing) {
@@ -283,7 +399,14 @@ export default function PosPage() {
                               p.id === prod.id ? { ...p, quantity: p.quantity + 1 } : p
                             );
                           }
-                          return [...prev, { ...prod, quantity: 1, numericPrice }];
+                          return [
+                            ...prev,
+                            {
+                              ...prod,
+                              quantity: 1,
+                              numericPrice,
+                            },
+                          ];
                         });
                       }}
                     >
@@ -312,6 +435,85 @@ export default function PosPage() {
             <p className="text-sm text-gray-500">Aún no has agregado productos.</p>
           ) : (
             <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-1">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    Nombre del cliente *
+                  </label>
+                  <input
+                    className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+                    placeholder="Ej: Juan Pérez"
+                    value={customer.name}
+                    onChange={(e) => setCustomer((c) => ({ ...c, name: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    Teléfono *
+                  </label>
+                  <input
+                    className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+                    placeholder="+56 9 1234 5678"
+                    value={customer.phone}
+                    onChange={(e) => setCustomer((c) => ({ ...c, phone: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    Correo (opcional)
+                  </label>
+                  <input
+                    className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+                    placeholder="cliente@correo.com"
+                    value={customer.email}
+                    onChange={(e) => setCustomer((c) => ({ ...c, email: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    Tipo de entrega
+                  </label>
+                  <select
+                    className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+                    value={orderType}
+                    onChange={(e) => setOrderType(e.target.value as 'pickup' | 'delivery')}
+                  >
+                    <option value="pickup">Retiro en local</option>
+                    <option value="delivery">Delivery</option>
+                  </select>
+                </div>
+              </div>
+              {orderType === 'delivery' && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Dirección de entrega *
+                    </label>
+                    <input
+                      className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+                      placeholder="Calle, número, comuna"
+                      value={deliveryAddress}
+                      onChange={(e) => setDeliveryAddress(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Referencia (opcional)
+                    </label>
+                    <input
+                      className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+                      placeholder="Depto, piso, indicaciones"
+                      value={deliveryNotes}
+                      onChange={(e) => setDeliveryNotes(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+              {error && (
+                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {error}
+                </div>
+              )}
               <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
                 {cart.map((item) => (
                   <div
@@ -365,18 +567,26 @@ export default function PosPage() {
               <div className="flex items-center justify-between text-sm font-semibold text-gray-800">
                 <span>Total</span>
                 <span className="text-primary text-lg">
-                  $
-                  {cart
-                    .reduce((acc, item) => acc + item.numericPrice * item.quantity, 0)
-                    .toFixed(2)}
+                  {formatClp(
+                    cart.reduce(
+                      (acc, item) => acc + item.numericPrice * item.quantity,
+                      0
+                    )
+                  )}
                 </span>
               </div>
 
               <div className="flex gap-2">
                 <button
-                  className="flex-1 bg-primary text-white rounded-lg py-3 font-bold hover:bg-primary/90 transition-colors"
+                  className={`flex-1 rounded-lg py-3 font-bold transition-colors ${
+                    canCheckout
+                      ? 'bg-primary text-white hover:bg-primary/90'
+                      : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  }`}
+                  onClick={handleContinue}
+                  disabled={!canCheckout || submittingOrder}
                 >
-                  Continuar
+                  {submittingOrder ? 'Creando...' : 'Continuar'}
                 </button>
                 <button
                   className="px-4 py-3 rounded-lg border border-primary/20 text-gray-700 hover:bg-primary/5"
@@ -389,6 +599,70 @@ export default function PosPage() {
           )}
         </div>
       </div>
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined text-primary text-3xl">help</span>
+              <div>
+                <h4 className="text-lg font-bold text-gray-900">Confirmar creación</h4>
+                <p className="text-sm text-gray-600">
+                  ¿Deseas crear esta orden con el cliente y productos seleccionados?
+                </p>
+              </div>
+            </div>
+            <div className="bg-background-light rounded-xl border border-primary/10 p-4 text-sm text-gray-700 space-y-1">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Cliente</span>
+                <span className="font-semibold">{customer.name || 'Sin nombre'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Teléfono</span>
+                <span className="font-semibold">{customer.phone || '—'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Tipo</span>
+                <span className="font-semibold">
+                  {orderType === 'delivery' ? 'Delivery' : 'Retiro'}
+                </span>
+              </div>
+              {orderType === 'delivery' && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Dirección</span>
+                  <span className="font-semibold text-right">{deliveryAddress}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-gray-500">Total</span>
+                <span className="font-bold text-primary">
+                  {formatClp(
+                    cart.reduce(
+                      (acc, item) => acc + item.numericPrice * item.quantity,
+                      0
+                    )
+                  )}
+                </span>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-4 py-2 rounded-lg border border-primary/20 text-gray-700 hover:bg-primary/5"
+                onClick={() => setConfirmOpen(false)}
+                disabled={submittingOrder}
+              >
+                Cancelar
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+                onClick={handleCreateOrder}
+                disabled={submittingOrder}
+              >
+                {submittingOrder ? 'Creando...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

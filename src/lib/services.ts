@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { config } from "./config";
 
 const qs = (params?: Record<string, string | number | boolean | undefined>) => {
   if (!params) return "";
@@ -84,10 +85,13 @@ export const categoryService = {
   create: (data: unknown) => api.post("categories", data, { auth: true }),
   createBulk: (data: unknown) =>
     api.post("categories/bulk", data, { auth: true }),
-  update: (id: string | number, data: unknown) =>
-    api.put(`categories/${id}`, data, { auth: true }),
-  remove: (id: string | number) =>
-    api.delete(`categories/${id}`, { auth: true }),
+  update: (
+    id: string | number,
+    data: unknown,
+    params?: { business_id?: string | number },
+  ) => api.put(`categories/${id}${qs(params)}`, data, { auth: true }),
+  remove: (id: string | number, params?: { business_id?: string | number }) =>
+    api.delete(`categories/${id}${qs(params)}`, { auth: true }),
 };
 
 export const productService = {
@@ -103,6 +107,7 @@ export const productService = {
   createWithImage: (payload: {
     name: string;
     description?: string;
+    sku?: string;
     price: string | number;
     category_id: string | number;
     status?: string;
@@ -125,6 +130,7 @@ export const productService = {
   createBulkWithImage: (payload: {
     name: string;
     description?: string;
+    sku?: string;
     price: string | number;
     category_id: string | number;
     status?: string;
@@ -148,8 +154,21 @@ export const productService = {
   },
   update: (id: string | number, data: unknown) =>
     api.put(`products/${id}`, data, { auth: true }),
-  updateStatus: (id: string | number, data: unknown) =>
-    api.post(`products/${id}/status`, data, { auth: true }),
+  updateStatus: (
+    id: string | number,
+    data: unknown,
+    params?: { business_id?: string | number },
+  ) => api.patch(`products/${id}/status${qs(params)}`, data, { auth: true }),
+  importOwner: (
+    file: File | Blob,
+    params?: { business_id?: string | number },
+  ) => {
+    const form = new FormData();
+    form.append("file", file);
+    return api.postForm(`products/owner/import${qs(params)}`, form, {
+      auth: true,
+    });
+  },
   remove: (id: string | number) => api.delete(`products/${id}`, { auth: true }),
   addOption: (id: string | number, data: unknown) =>
     api.post(`products/${id}/options`, data, { auth: true }),
@@ -157,6 +176,30 @@ export const productService = {
     api.put(`product-options/${optionId}`, data, { auth: true }),
   removeOption: (optionId: string | number) =>
     api.delete(`product-options/${optionId}`, { auth: true }),
+  exportOwner: async (params?: {
+    business_id?: string | number;
+    category_id?: string | number;
+    status?: string;
+  }) => {
+    const token =
+      (typeof window !== "undefined" &&
+        (localStorage.getItem("fasttrucks_access_token") ||
+          sessionStorage.getItem("fasttrucks_access_token"))) ||
+      "";
+    const url = `${config.api.baseUrl}products/owner/export${qs(params)}`;
+    const resp = await fetch(url, {
+      method: "GET",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        Accept: "text/csv",
+      },
+    });
+    if (!resp.ok) {
+      throw new Error(`No se pudo exportar (${resp.status})`);
+    }
+    const blob = await resp.blob();
+    return blob;
+  },
 };
 
 export const promotionService = {
@@ -197,12 +240,12 @@ export const orderService = {
     status?: string;
     order_source?: string;
     customer_id?: string | number;
-  }) => api.get(`/orders${qs(params)}`, { auth: true }),
-  get: (id: string | number) => api.get(`/orders/${id}`, { auth: true }),
-  create: (data: unknown) => api.post("/orders", data, { auth: true }),
+  }) => api.get(`orders${qs(params)}`, { auth: true }),
+  get: (id: string | number) => api.get(`orders/${id}`, { auth: true }),
+  create: (data: unknown) => api.post("orders", data, { auth: true }),
   updateStatus: (id: string | number, data: unknown) =>
-    api.post(`/orders/${id}/status`, data, { auth: true }),
-  remove: (id: string | number) => api.delete(`/orders/${id}`, { auth: true }),
+    api.post(`orders/${id}/status`, data, { auth: true }),
+  remove: (id: string | number) => api.delete(`orders/${id}`, { auth: true }),
 };
 
 export const paymentService = {

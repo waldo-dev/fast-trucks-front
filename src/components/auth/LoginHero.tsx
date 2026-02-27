@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 
 export const LoginHero = () => {
   return (
@@ -7,14 +8,21 @@ export const LoginHero = () => {
         className="absolute inset-0 bg-cover bg-center"
         style={{
           backgroundImage:
-            "url('https://lh3.googleusercontent.com/aida-public/AB6AXuCsL4ic0G6cFsoA5RAE6Da8YYSeVhcy32-QwzdeMXtRwzhCjHjw6g3wzhx013kw6JZ0r-4wL74pbLyq1tIEteC5LT4xTrp9eTnIQP5UyGE3vJK7JSjROD54lFQDeYmWtJMrzLiN2S41FUozZx7ta-INI7XLRnxAknzL-GsqLQDe_OXFg5KZiXkqzwagUqBD2CI-nFzppOVLsOPCOJ58z7C6TsUG3XAw7LfpHkEUaO2GKDWFESgqxBfoI3LUjh4te4RbKgY3igHXruiX')",
+            "url('https://firebasestorage.googleapis.com/v0/b/fast-trucks.firebasestorage.app/o/tablet-dashboard.jpeg?alt=media&token=9f74e362-b403-45ed-a3cc-34bf860d8742')",
         }}
       />
       <div className="absolute inset-0 food-overlay flex flex-col justify-end p-12 lg:p-20">
         <div className="max-w-xl">
           <div className="flex items-center gap-2 mb-6">
             <div className="bg-primary p-2 rounded-lg text-white">
-              <span className="material-symbols-outlined text-3xl">restaurant</span>
+              <Image
+                src="/logo-blanco-sinfondo.png"
+                alt="Operfoods"
+                width={36}
+                height={36}
+                className="rounded-md"
+                priority
+              />
             </div>
             <span className="text-white text-2xl font-bold tracking-tight">Operfoods</span>
           </div>
