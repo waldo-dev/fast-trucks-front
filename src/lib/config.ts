@@ -9,7 +9,7 @@ export const config = {
     timeout: parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || '30000', 10),
   },
   app: {
-    name: process.env.NEXT_PUBLIC_APP_NAME || 'Fast Trucks Admin',
+    name: process.env.NEXT_PUBLIC_APP_NAME || 'Operfoods Admin',
   },
   auth: {
     enabled: process.env.NEXT_PUBLIC_AUTH_ENABLED === 'true',

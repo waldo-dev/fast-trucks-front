@@ -77,7 +77,7 @@ export default function AdminOverviewPage() {
           Salud y rendimiento en tiempo real
         </h1>
         <p className="text-[#8a7560] dark:text-[#a3907d] max-w-3xl">
-          Métricas globales para monitorear el ecosistema Fast Trucks, incluyendo negocios, ingresos,
+          Métricas globales para monitorear el ecosistema Operfoods, incluyendo negocios, ingresos,
           eventos críticos y crecimiento mensual.
         </p>
       </div>

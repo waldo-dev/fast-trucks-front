@@ -42,7 +42,7 @@ export const LoginForm = () => {
           <span className="material-symbols-outlined text-2xl">restaurant</span>
         </div>
         <span className="text-[#181411] dark:text-white text-xl font-bold tracking-tight">
-        Fast Trucks
+        Operfoods
         </span>
       </div>
 

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import '@/styles/globals.css';
 
 export const metadata: Metadata = {
-  title: 'Fast Trucks',
+  title: 'Operfoods',
   description: 'Panel administrativo SaaS para gestión de negocios de comida',
 };
 

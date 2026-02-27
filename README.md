@@ -1,4 +1,4 @@
-# Fast Trucks Admin - Panel Administrador SaaS
+# Operfoodss Admin - Panel Administrador SaaS
 
 Panel administrativo para locales de comida rápida construido con Next.js 14+, TypeScript y Tailwind CSS.
 
@@ -28,7 +28,7 @@ NEXT_PUBLIC_API_URL=http://localhost:3001/api
 NEXT_PUBLIC_AUTH_ENABLED=true
 
 # Nombre de la aplicación
-NEXT_PUBLIC_APP_NAME=Fast Trucks Admin
+NEXT_PUBLIC_APP_NAME=Operfoodss Admin
 
 # Timeout para peticiones API (en milisegundos)
 NEXT_PUBLIC_API_TIMEOUT=30000
@@ -108,7 +108,7 @@ src/
 |----------|-------------|-------------------|-----------|
 | `NEXT_PUBLIC_API_URL` | URL base del backend API | `http://localhost:3001/api` | ✅ Sí |
 | `NEXT_PUBLIC_AUTH_ENABLED` | Habilitar autenticación | `true` | ❌ No |
-| `NEXT_PUBLIC_APP_NAME` | Nombre de la aplicación | `Fast Trucks Admin` | ❌ No |
+| `NEXT_PUBLIC_APP_NAME` | Nombre de la aplicación | `Operfoodss Admin` | ❌ No |
 | `NEXT_PUBLIC_API_TIMEOUT` | Timeout para peticiones (ms) | `30000` | ❌ No |
 
 ### Conexión con Backend

@@ -12,7 +12,7 @@ export default function AdminIAPage() {
   return (
     <div className="flex flex-col gap-6">
       <header className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a7560]">Fast Trucks IA</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a7560]">Operfoods IA</p>
         <h1 className="text-3xl font-black text-[#181411] dark:text-white">Motor de IA</h1>
         <p className="text-[#8a7560] dark:text-[#a3907d]">
           Prepara la inteligencia como ventaja competitiva: adopción, resultados y alertas.
