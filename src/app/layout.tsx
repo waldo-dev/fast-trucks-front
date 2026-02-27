@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import '@/styles/globals.css';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export const metadata: Metadata = {
   title: 'Operfoods',
@@ -15,6 +17,7 @@ export default function RootLayout({
     <html lang="es" className="light">
       <body className="bg-background-light dark:bg-background-dark text-[#181411]">
         {children}
+        <ToastContainer position="top-right" theme="colored" />
       </body>
     </html>
   );

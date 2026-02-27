@@ -68,7 +68,13 @@ export const userService = {
   create: (data: unknown) => api.post("users", data, { auth: true }),
   update: (id: string | number, data: unknown) =>
     api.put(`users/${id}`, data, { auth: true }),
-  remove: (id: string | number) => api.delete(`users/${id}`, { auth: true }),
+  remove: (id: string | number, params?: { business_id?: string | number }) =>
+    api.delete(`users/${id}${qs(params)}`, { auth: true }),
+  updatePassword: (
+    id: string | number,
+    data: { password: string },
+    params?: { business_id?: string | number },
+  ) => api.patch(`users/${id}/password${qs(params)}`, data, { auth: true }),
 };
 
 export const categoryService = {

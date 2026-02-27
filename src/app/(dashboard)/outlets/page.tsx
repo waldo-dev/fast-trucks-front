@@ -93,7 +93,25 @@ export default function OutletsPage() {
     },
   ];
 
+  const presetColors = [
+    '#EC4913',
+    '#2A1E1A',
+    '#0EA5E9',
+    '#22C55E',
+    '#8B5CF6',
+    '#E11D48',
+    '#FACC15',
+    '#0F172A',
+  ];
+
   const router = useRouter();
+
+  const setColor = (key: 'primary_color' | 'secondary_color', value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
 
   const handleEdit = (id: number) => {
     const outlet = outletsData.find((o) => o.id === id);
@@ -147,6 +165,10 @@ export default function OutletsPage() {
     setCreateSuccess(null);
     if (!form.name || !form.brand_name) {
       setCreateError('Nombre y marca son obligatorios');
+      return;
+    }
+    if (!form.primary_color || !form.secondary_color) {
+      setCreateError('Colores primario y secundario son obligatorios');
       return;
     }
     setCreating(true);
@@ -344,21 +366,79 @@ export default function OutletsPage() {
               </div>
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-semibold text-[#181411] dark:text-white">Color primario</label>
-                <input
-                  className="h-11 rounded-lg border border-[#e6e0db] dark:border-[#3d3226] bg-white dark:bg-[#2d2419] px-3 text-sm"
-                  value={form.primary_color}
-                  onChange={(e) => setForm((prev) => ({ ...prev, primary_color: e.target.value }))}
-                  placeholder="#EC4913"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    className="h-11 w-14 rounded-lg border border-[#e6e0db] dark:border-[#3d3226] bg-white dark:bg-[#2d2419] cursor-pointer"
+                    value={form.primary_color || '#EC4913'}
+                    onChange={(e) => setColor('primary_color', e.target.value)}
+                  />
+                  <input
+                    className="flex-1 h-11 rounded-lg border border-[#e6e0db] dark:border-[#3d3226] bg-white dark:bg-[#2d2419] px-3 text-sm"
+                    value={form.primary_color}
+                    onChange={(e) => setColor('primary_color', e.target.value)}
+                    placeholder="#EC4913"
+                    required
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {presetColors.map((color) => {
+                    const isActive = (form.primary_color || '#EC4913').toLowerCase() === color.toLowerCase();
+                    return (
+                      <button
+                        key={`primary-${color}`}
+                        type="button"
+                        onClick={() => setColor('primary_color', color)}
+                        className={`h-8 w-8 rounded-full border transition ${
+                          isActive
+                            ? 'ring-2 ring-offset-2 ring-primary border-primary'
+                            : 'border-[#e6e0db] dark:border-[#3d3226] hover:ring-2 hover:ring-primary/40'
+                        }`}
+                        style={{ backgroundColor: color }}
+                        aria-label={`Seleccionar color primario ${color}`}
+                      />
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-[#8a7560] dark:text-[#a3907d]">Selecciona del selector, paleta o pega un HEX.</p>
               </div>
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-semibold text-[#181411] dark:text-white">Color secundario</label>
-                <input
-                  className="h-11 rounded-lg border border-[#e6e0db] dark:border-[#3d3226] bg-white dark:bg-[#2d2419] px-3 text-sm"
-                  value={form.secondary_color}
-                  onChange={(e) => setForm((prev) => ({ ...prev, secondary_color: e.target.value }))}
-                  placeholder="#2A1E1A"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    className="h-11 w-14 rounded-lg border border-[#e6e0db] dark:border-[#3d3226] bg-white dark:bg-[#2d2419] cursor-pointer"
+                    value={form.secondary_color || '#2A1E1A'}
+                    onChange={(e) => setColor('secondary_color', e.target.value)}
+                  />
+                  <input
+                    className="flex-1 h-11 rounded-lg border border-[#e6e0db] dark:border-[#3d3226] bg-white dark:bg-[#2d2419] px-3 text-sm"
+                    value={form.secondary_color}
+                    onChange={(e) => setColor('secondary_color', e.target.value)}
+                    placeholder="#2A1E1A"
+                    required
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {presetColors.map((color) => {
+                    const isActive = (form.secondary_color || '#2A1E1A').toLowerCase() === color.toLowerCase();
+                    return (
+                      <button
+                        key={`secondary-${color}`}
+                        type="button"
+                        onClick={() => setColor('secondary_color', color)}
+                        className={`h-8 w-8 rounded-full border transition ${
+                          isActive
+                            ? 'ring-2 ring-offset-2 ring-primary border-primary'
+                            : 'border-[#e6e0db] dark:border-[#3d3226] hover:ring-2 hover:ring-primary/40'
+                        }`}
+                        style={{ backgroundColor: color }}
+                        aria-label={`Seleccionar color secundario ${color}`}
+                      />
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-[#8a7560] dark:text-[#a3907d]">Elige del selector, paleta o pega tu código.</p>
               </div>
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-semibold text-[#181411] dark:text-white">Logo (archivo)</label>
@@ -367,6 +447,7 @@ export default function OutletsPage() {
                   type="file"
                   accept="image/*"
                   onChange={handleFile}
+                  required
                 />
               </div>
               <div className="flex items-end">
