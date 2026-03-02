@@ -57,13 +57,13 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
       : item
   );
 
-  const resolveOwnerItems = () => {
-    const byHref = (href: string) =>
-      [
-        ...contextAwareOperatorItems,
-        ...SIDEBAR_ITEMS,
-        USERS_SIDEBAR_ITEM,
-      ].find((i) => i.href === href);
+  type SidebarItem = { title: string; href: string; icon: string };
+
+  const resolveOwnerItems = (): SidebarItem[] => {
+    const byHref = (href: string): SidebarItem | undefined =>
+      [...contextAwareOperatorItems, ...SIDEBAR_ITEMS, USERS_SIDEBAR_ITEM].find(
+        (i) => i.href === href
+      );
 
     const orderedHrefs = [
       '/', // Inicio
@@ -84,14 +84,13 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
     ];
 
     const seen = new Set<string>();
-    const ordered = orderedHrefs
-      .map((href) => {
-        const item = byHref(href);
-        if (!item || seen.has(href)) return null;
-        seen.add(href);
-        return item;
-      })
-      .filter(Boolean) as typeof SIDEBAR_ITEMS;
+    const ordered = orderedHrefs.reduce<SidebarItem[]>((acc, href) => {
+      const item = byHref(href);
+      if (!item || seen.has(href)) return acc;
+      seen.add(href);
+      acc.push(item);
+      return acc;
+    }, []);
 
     return ordered;
   };
