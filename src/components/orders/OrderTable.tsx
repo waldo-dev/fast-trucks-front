@@ -3,6 +3,7 @@ import { OrderRow } from './OrderRow';
 
 interface Order {
   id: string;
+  backendId: string;
   time: string;
   venue: string;
   customer: {
@@ -10,7 +11,7 @@ interface Order {
     name: string;
   };
   type: 'Delivery' | 'Pickup';
-  status: 'new' | 'preparing' | 'ready' | 'delivered';
+  status: 'new' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
   total: string;
   isDelivered?: boolean;
 }
@@ -18,9 +19,16 @@ interface Order {
 interface OrderTableProps {
   orders: Order[];
   onViewDetails: (orderId: string) => void;
+  onUpdateStatus: (orderId: string, nextStatus: string) => void;
+  updatingId: string | null;
 }
 
-export const OrderTable: React.FC<OrderTableProps> = ({ orders, onViewDetails }) => {
+export const OrderTable: React.FC<OrderTableProps> = ({
+  orders,
+  onViewDetails,
+  onUpdateStatus,
+  updatingId,
+}) => {
   return (
     <div className="overflow-x-auto rounded-b-2xl border border-[#e6e0db] bg-white shadow-sm">
       <table className="w-full text-left border-collapse min-w-[1000px]">
@@ -51,7 +59,13 @@ export const OrderTable: React.FC<OrderTableProps> = ({ orders, onViewDetails })
         </thead>
         <tbody className="divide-y divide-[#e6e0db]">
           {orders.map((order) => (
-            <OrderRow key={order.id} order={order} onViewDetails={onViewDetails} />
+            <OrderRow
+              key={order.id}
+              order={order}
+              onViewDetails={onViewDetails}
+              onUpdateStatus={onUpdateStatus}
+              updating={updatingId === order.backendId}
+            />
           ))}
         </tbody>
       </table>

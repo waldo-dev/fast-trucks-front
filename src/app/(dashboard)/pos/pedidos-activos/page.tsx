@@ -8,10 +8,12 @@ type StatusValue = 'ALL' | 'CREATED' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'DE
 
 type UiOrder = {
   id: string;
+  backendId: string;
   code: string;
   status: StatusValue;
   type: 'PICKUP' | 'DELIVERY' | string;
   source: string;
+  paymentType?: string;
   customerName: string;
   customerPhone: string;
   address: string;
@@ -98,11 +100,13 @@ export default function PosPedidosActivosPage() {
         const list = (resp as any)?.data ?? resp;
         if (Array.isArray(list)) {
           const mapped: UiOrder[] = list.map((o: any) => ({
-            id: String(o.id ?? o.code ?? Math.random().toString(36).slice(2)),
+            id: String(o.code || o.external_id || o.id || Math.random().toString(36).slice(2)),
+            backendId: String(o.id ?? o.code ?? o.external_id ?? Math.random().toString(36).slice(2)),
             code: o.code || o.external_id || `ORD-${o.id ?? 'N/A'}`,
             status: (o.status || 'CREATED').toUpperCase(),
             type: (o.order_type || o.type || 'PICKUP').toUpperCase(),
             source: (o.order_source || o.source || 'WHATSAPP').toUpperCase(),
+            paymentType: o.payment_type || o.paymentMethod || undefined,
             customerName: o.customer?.name || 'Sin nombre',
             customerPhone: o.customer?.phone || '—',
             address:
@@ -140,11 +144,13 @@ export default function PosPedidosActivosPage() {
         const list = (resp as any)?.data ?? resp;
         if (Array.isArray(list)) {
           const mapped: UiOrder[] = list.map((o: any) => ({
-            id: String(o.id ?? o.code ?? Math.random().toString(36).slice(2)),
+            id: String(o.code || o.external_id || o.id || Math.random().toString(36).slice(2)),
+            backendId: String(o.id ?? o.code ?? o.external_id ?? Math.random().toString(36).slice(2)),
             code: o.code || o.external_id || `ORD-${o.id ?? 'N/A'}`,
             status: (o.status || 'CREATED').toUpperCase(),
             type: (o.order_type || o.type || 'PICKUP').toUpperCase(),
             source: (o.order_source || o.source || 'WHATSAPP').toUpperCase(),
+            paymentType: o.payment_type || o.paymentMethod || undefined,
             customerName: o.customer?.name || 'Sin nombre',
             customerPhone: o.customer?.phone || '—',
             address:
@@ -267,6 +273,7 @@ export default function PosPedidosActivosPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Tipo</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Estado</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Canal</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Pago</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Total</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Creado</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Acciones</th>
@@ -312,27 +319,27 @@ export default function PosPedidosActivosPage() {
                       })()}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">{o.source}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {o.paymentType ? o.paymentType.toUpperCase() : '—'}
+                    </td>
                     <td className="px-4 py-3 font-semibold text-gray-900">{formatClp(o.total)}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">{formatDate(o.createdAt)}</td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        {STATUS_TRANSITIONS[o.status as StatusValue]?.length ? (
-                          STATUS_TRANSITIONS[o.status as StatusValue].map((next) => (
-                            <button
-                              key={next}
-                              className={`px-3 py-1 rounded-full text-xs font-semibold border ${
-                                updatingId === o.id
-                                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                  : 'bg-white text-primary border-primary/30 hover:bg-primary/5'
-                              }`}
-                              disabled={updatingId === o.id}
-                              onClick={() => handleStatusChange(o.id, next)}
-                            >
-                              {STATUS_OPTIONS.find((s) => s.value === next)?.label || next}
-                            </button>
-                          ))
-                        ) : (
-                          <span className="text-xs text-gray-500">Sin acciones</span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          className="border border-primary/20 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-primary/20"
+                          value={o.status}
+                          onChange={(e) => handleStatusChange(o.backendId, e.target.value as StatusValue)}
+                          disabled={updatingId === o.backendId}
+                        >
+                          {STATUS_OPTIONS.filter((s) => s.value !== 'ALL').map((s) => (
+                            <option key={s.value} value={s.value}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                        {updatingId === o.backendId && (
+                          <span className="text-xs text-gray-500">Actualizando...</span>
                         )}
                       </div>
                     </td>

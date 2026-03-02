@@ -14,6 +14,24 @@ import {
 } from '@/lib/constants';
 import { getCurrentUser, getCachedUser, logout } from '@/lib/auth';
 
+type OperatingContext =
+  | { type: 'event'; event_id?: string; event_name?: string; business_id?: string }
+  | { type: 'business'; business_id?: string }
+  | null;
+
+const readOperatingContext = (): OperatingContext => {
+  if (typeof window === 'undefined') return null;
+  const raw =
+    localStorage.getItem('business_operating_context') ??
+    sessionStorage.getItem('business_operating_context');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as OperatingContext;
+  } catch {
+    return null;
+  }
+};
+
 interface SidebarProps {
   isMobileOpen?: boolean;
   onClose?: () => void;
@@ -23,17 +41,28 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<Awaited<ReturnType<typeof getCurrentUser>>>(getCachedUser());
+  const [operatingContext, setOperatingContext] = useState<OperatingContext>(null);
   const role = user?.role?.toUpperCase();
   const isAdmin = role === 'ADMIN';
   const isOperator = role === 'LOCAL_OPERATOR';
   const isOwner = role ? OWNER_ROLES.includes(role as (typeof OWNER_ROLES)[number]) : false;
 
+  useEffect(() => {
+    setOperatingContext(readOperatingContext());
+  }, []);
+
+  const contextAwareOperatorItems = OPERATOR_SIDEBAR_ITEMS.map((item) =>
+    item.href === '/pos/cambiar-evento' && operatingContext?.type === 'event'
+      ? { ...item, title: 'Cambiar Local' }
+      : item
+  );
+
   const sidebarItems = isAdmin
     ? [...ADMIN_SIDEBAR_ITEMS, ADMIN_USERS_SIDEBAR_ITEM]
     : isOperator
-    ? OPERATOR_SIDEBAR_ITEMS
+    ? contextAwareOperatorItems
     : isOwner
-    ? [...SIDEBAR_ITEMS, USERS_SIDEBAR_ITEM]
+    ? [...contextAwareOperatorItems, ...SIDEBAR_ITEMS, USERS_SIDEBAR_ITEM]
     : SIDEBAR_ITEMS;
 
   useEffect(() => {

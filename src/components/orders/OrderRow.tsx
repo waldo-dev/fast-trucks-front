@@ -2,6 +2,7 @@ import React from 'react';
 
 interface Order {
   id: string;
+  backendId: string;
   time: string;
   venue: string;
   customer: {
@@ -9,7 +10,7 @@ interface Order {
     name: string;
   };
   type: 'Delivery' | 'Pickup';
-  status: 'new' | 'preparing' | 'ready' | 'delivered';
+  status: 'new' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
   total: string;
   isDelivered?: boolean;
 }
@@ -17,9 +18,42 @@ interface Order {
 interface OrderRowProps {
   order: Order;
   onViewDetails: (orderId: string) => void;
+  onUpdateStatus: (orderId: string, nextStatus: string) => void;
+  updating?: boolean;
 }
 
-export const OrderRow: React.FC<OrderRowProps> = ({ order, onViewDetails }) => {
+const uiToApiStatus = (status: Order['status']): string => {
+  switch (status) {
+    case 'new':
+      return 'CREATED';
+    case 'preparing':
+      return 'PREPARING';
+    case 'ready':
+      return 'READY';
+    case 'delivered':
+      return 'DELIVERED';
+    case 'cancelled':
+      return 'CANCELLED';
+    default:
+      return 'CREATED';
+  }
+};
+
+const statusOptions = [
+  { value: 'CREATED', label: 'Creado' },
+  { value: 'CONFIRMED', label: 'Confirmado' },
+  { value: 'PREPARING', label: 'Preparando' },
+  { value: 'READY', label: 'Listo' },
+  { value: 'DELIVERED', label: 'Entregado' },
+  { value: 'CANCELLED', label: 'Cancelado' },
+];
+
+export const OrderRow: React.FC<OrderRowProps> = ({
+  order,
+  onViewDetails,
+  onUpdateStatus,
+  updating,
+}) => {
   const getStatusClass = (status: string) => {
     switch (status) {
       case 'new':
@@ -30,6 +64,8 @@ export const OrderRow: React.FC<OrderRowProps> = ({ order, onViewDetails }) => {
         return 'status-ready';
       case 'delivered':
         return 'status-delivered';
+      case 'cancelled':
+        return 'status-cancelled';
       default:
         return 'status-new';
     }
@@ -45,6 +81,8 @@ export const OrderRow: React.FC<OrderRowProps> = ({ order, onViewDetails }) => {
         return 'Listo';
       case 'delivered':
         return 'Entregado';
+      case 'cancelled':
+        return 'Cancelado';
       default:
         return 'Nuevo';
     }
@@ -95,12 +133,26 @@ export const OrderRow: React.FC<OrderRowProps> = ({ order, onViewDetails }) => {
       </td>
       <td className="px-6 py-4 text-sm font-bold text-[#181411]">{order.total}</td>
       <td className="px-6 py-4 text-right">
-        <button
-          onClick={() => onViewDetails(order.id)}
-          className="text-primary text-sm font-bold hover:underline"
-        >
-          Ver Detalles
-        </button>
+        <div className="flex items-center justify-end gap-2">
+          <select
+            className="border border-[#e6e0db] rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-primary/20"
+            value={uiToApiStatus(order.status)}
+            onChange={(e) => onUpdateStatus(order.backendId, e.target.value)}
+            disabled={updating}
+          >
+            {statusOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => onViewDetails(order.id)}
+            className="text-primary text-sm font-bold hover:underline"
+          >
+            Ver Detalles
+          </button>
+        </div>
       </td>
     </tr>
   );

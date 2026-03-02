@@ -1,141 +1,224 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { CustomerStats } from '@/components/customers/CustomerStats';
 import { CustomerTable } from '@/components/customers/CustomerTable';
+import { businessService, customerService } from '@/lib/services';
+import { getAccessToken, getCachedUser } from '@/lib/auth';
+import { toast } from 'react-toastify';
+import { config } from '@/lib/config';
+
+type UiCustomer = {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  initials: string;
+  avatarColor: string;
+  totalOrders: number;
+  lastOrder: { time: string; venue: string; isToday?: boolean };
+  status: 'VIP' | 'Active' | 'New';
+  isExpanded?: boolean;
+};
 
 export default function CustomersPage() {
-  const [expandedCustomer, setExpandedCustomer] = useState<number | null>(4);
+  const [expandedCustomer, setExpandedCustomer] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [customers, setCustomers] = useState<UiCustomer[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [businessNames, setBusinessNames] = useState<Record<string, string>>({});
+  const [businessOptions, setBusinessOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string>('');
   const [newCustomer, setNewCustomer] = useState({
     name: '',
     email: '',
     phone: '',
+    address: '',
     status: 'Active',
   });
 
-  const customers = [
-    {
-      id: 1,
-      name: 'Alex Morgan',
-      email: 'alex.morgan@email.com',
-      phone: '+1 (555) 123-4567',
-      initials: 'AM',
-      avatarColor: 'from-primary/20 to-primary/40 text-primary',
-      totalOrders: 42,
-      lastOrder: {
-        time: 'Hace 2 horas',
-        venue: 'Local Centro',
-      },
-      status: 'VIP' as const,
-    },
-    {
-      id: 2,
-      name: 'Sarah Richardson',
-      email: 'sarah.rich@webmail.com',
-      phone: '+1 (555) 987-6543',
-      initials: 'SR',
-      avatarColor: 'from-blue-100 to-blue-200 text-blue-600',
-      totalOrders: 18,
-      lastOrder: {
-        time: 'Ayer',
-        venue: 'Food Truck B',
-      },
-      status: 'Active' as const,
-    },
-    {
-      id: 3,
-      name: 'James Lora',
-      email: 'j.lora@service.com',
-      phone: '+1 (555) 246-8101',
-      initials: 'JL',
-      avatarColor: 'from-purple-100 to-purple-200 text-purple-600',
-      totalOrders: 5,
-      lastOrder: {
-        time: '14 Ago, 2023',
-        venue: 'Local Principal',
-      },
-      status: 'New' as const,
-    },
-    {
-      id: 4,
-      name: 'Kevin Watson',
-      email: 'kwatson@provider.net',
-      phone: '+1 (555) 369-1215',
-      initials: 'KW',
-      avatarColor: 'from-orange-100 to-orange-200 text-orange-600',
-      totalOrders: 12,
-      lastOrder: {
-        time: 'Hoy, 11:45 AM',
-        venue: 'Food Truck C',
-        isToday: true,
-      },
-      status: 'Active' as const,
-      isExpanded: expandedCustomer === 4,
-      recentOrders: [
-        {
-          id: '82931',
-          items: '2x Pepperoni Feast, 1x Coca-Cola',
-          total: '$42.50',
-          time: 'Hace 2h',
-        },
-        {
-          id: '82504',
-          items: '1x Veggie Deluxe (Grande)',
-          total: '$24.99',
-          time: 'Martes pasado',
-        },
-      ],
-      favoriteItem: 'Pizza Carnívora',
-    },
-    {
-      id: 5,
-      name: 'María Delgado',
-      email: 'm.delgado@workmail.com',
-      phone: '+1 (555) 753-9514',
-      initials: 'MD',
-      avatarColor: 'from-green-100 to-green-200 text-green-600',
-      totalOrders: 27,
-      lastOrder: {
-        time: 'Hace 3 días',
-        venue: 'Local Centro',
-      },
-      status: 'VIP' as const,
-    },
+  const initialsFromName = (name?: string) => {
+    if (!name) return 'NN';
+    const parts = name.trim().split(' ');
+    const [first, second] = parts;
+    return `${first?.[0] ?? ''}${second?.[0] ?? ''}`.toUpperCase() || 'NN';
+  };
+
+  const formatDateLabel = (iso?: string) => {
+    if (!iso) return '—';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '—';
+    const now = new Date();
+    const sameDay =
+      date.getFullYear() === now.getFullYear() &&
+      date.getMonth() === now.getMonth() &&
+      date.getDate() === now.getDate();
+    return new Intl.DateTimeFormat('es-CL', {
+      dateStyle: sameDay ? undefined : 'short',
+      timeStyle: 'short',
+    }).format(date);
+  };
+
+  const gradientPalette = [
+    'from-primary/20 to-primary/40 text-primary',
+    'from-blue-100 to-blue-200 text-blue-600',
+    'from-purple-100 to-purple-200 text-purple-600',
+    'from-orange-100 to-orange-200 text-orange-600',
+    'from-green-100 to-green-200 text-green-600',
   ];
 
-  const stats = [
-    {
-      icon: 'group',
-      iconBg: 'bg-primary/10',
-      iconColor: 'text-primary',
-      label: 'Total Clientes',
-      value: '1,284',
-      change: '+12.5%',
-      changeColor: 'text-[#07880e]',
-      changeBg: 'bg-green-50',
-    },
-    {
-      icon: 'shopping_cart',
-      iconBg: 'bg-blue-50',
-      iconColor: 'text-blue-600',
-      label: 'Activos Esta Semana',
-      value: '156',
-      change: '+5.2%',
-      changeColor: 'text-[#07880e]',
-      changeBg: 'bg-green-50',
-    },
-    {
-      icon: 'repeat',
-      iconBg: 'bg-orange-50',
-      iconColor: 'text-orange-600',
-      label: 'Frecuencia Promedio',
-      value: '2.4/mes',
-      change: '-2%',
-      changeColor: 'text-red-500',
-      changeBg: 'bg-red-50',
-    },
-  ];
+  const mapCustomers = (data: Array<{ business_id?: string | number; customers?: any[] }>) => {
+    const mapped: UiCustomer[] = [];
+    data.forEach((group, groupIdx) => {
+      const venue =
+        (group.business_id &&
+          businessNames[String(group.business_id)]) ||
+        (group.business_id ? `Local ${group.business_id}` : 'Local sin nombre');
+      (group.customers || []).forEach((customer: any, idx: number) => {
+        const numericId = Number(customer.id ?? `${groupIdx}-${idx}`);
+        const id = Number.isFinite(numericId) ? numericId : idx + 1;
+        const name = customer.name || 'Sin nombre';
+        const email = customer.email || 'Sin correo';
+        const phone = customer.phone || 'Sin teléfono';
+        const color = gradientPalette[(groupIdx + idx) % gradientPalette.length];
+        const orders = Array.isArray(customer.orders) ? customer.orders : [];
+        const latestOrder = orders
+          .slice()
+          .sort(
+            (a: any, b: any) =>
+              new Date(b.created_at || b.createdAt || '').getTime() -
+              new Date(a.created_at || a.createdAt || '').getTime()
+          )[0];
+        const status: UiCustomer['status'] = orders.length === 0 ? 'New' : 'Active';
+        mapped.push({
+          id,
+          name,
+          email,
+          phone,
+          initials: customer.initials || initialsFromName(name),
+          avatarColor: color,
+          totalOrders: orders.length,
+          lastOrder: {
+            time: formatDateLabel(latestOrder?.created_at || latestOrder?.createdAt),
+            venue,
+            isToday: !!latestOrder?.created_at || !!latestOrder?.createdAt
+              ? (() => {
+                  const d = new Date(latestOrder?.created_at || latestOrder?.createdAt);
+                  const now = new Date();
+                  return (
+                    d.getFullYear() === now.getFullYear() &&
+                    d.getMonth() === now.getMonth() &&
+                    d.getDate() === now.getDate()
+                  );
+                })()
+              : false,
+          },
+          status,
+        });
+      });
+    });
+    return mapped;
+  };
+
+  const fetchCustomers = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const user = getCachedUser();
+    if (!user?.id) {
+      setError('No se encontró el usuario en sesión.');
+      setCustomers([]);
+      setLoading(false);
+      return;
+    }
+    try {
+      const resp = await customerService.listByUser(user.id);
+      const data = (resp as any)?.data ?? resp;
+      if (Array.isArray(data)) {
+        setCustomers(mapCustomers(data));
+      } else {
+        setCustomers([]);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'No se pudieron cargar los clientes';
+      setError(msg);
+      toast.error(msg);
+      setCustomers([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchBusinessNames = useCallback(async () => {
+    try {
+      const resp = await businessService.list();
+      const list = (resp as any)?.data ?? resp;
+      if (Array.isArray(list)) {
+        const dict: Record<string, string> = {};
+        const opts: Array<{ id: string; name: string }> = [];
+        list.forEach((b: any) => {
+          if (b?.id) {
+            const idStr = String(b.id);
+            const name = b.name || b.brand_name || `Local ${b.id}`;
+            dict[idStr] = name;
+            opts.push({ id: idStr, name });
+          }
+        });
+        setBusinessNames(dict);
+        setBusinessOptions(opts);
+        if (!selectedBusinessId && opts.length) {
+          const cached = getCachedUser()?.businessId;
+          const found = cached ? opts.find((o) => o.id === String(cached)) : undefined;
+          setSelectedBusinessId(found?.id || opts[0].id);
+        }
+      }
+    } catch {
+      // silencioso, usamos fallback de id
+    }
+  }, [selectedBusinessId]);
+
+  useEffect(() => {
+    fetchCustomers();
+    fetchBusinessNames();
+  }, [fetchCustomers, fetchBusinessNames]);
+
+  const stats = useMemo(
+    () => [
+      {
+        icon: 'group',
+        iconBg: 'bg-primary/10',
+        iconColor: 'text-primary',
+        label: 'Total Clientes',
+        value: new Intl.NumberFormat('es-CL').format(customers.length),
+        change: '',
+        changeColor: 'text-[#07880e]',
+        changeBg: 'bg-green-50',
+      },
+      {
+        icon: 'shopping_cart',
+        iconBg: 'bg-blue-50',
+        iconColor: 'text-blue-600',
+        label: 'Activos Esta Semana',
+        value: '—',
+        change: '',
+        changeColor: 'text-[#07880e]',
+        changeBg: 'bg-green-50',
+      },
+      {
+        icon: 'repeat',
+        iconBg: 'bg-orange-50',
+        iconColor: 'text-orange-600',
+        label: 'Frecuencia Promedio',
+        value: '—',
+        change: '',
+        changeColor: 'text-red-500',
+        changeBg: 'bg-red-50',
+      },
+    ],
+    [customers.length]
+  );
 
   const handleToggleExpand = (id: number) => {
     setExpandedCustomer(expandedCustomer === id ? null : id);
@@ -146,9 +229,37 @@ export default function CustomersPage() {
     console.log('Ver perfil completo:', id);
   };
 
-  const handleExport = () => {
-    // Placeholder: sin acción real
-    console.log('Exportar CSV');
+  const handleExport = async () => {
+    const user = getCachedUser();
+    const token = getAccessToken();
+    if (!user?.id || !token) {
+      toast.error('No se encontró sesión activa para exportar.');
+      return;
+    }
+    try {
+      setExporting(true);
+      const url = `${config.api.baseUrl}customers/by-user/${user.id}/csv`;
+      const resp = await fetch(url, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!resp.ok) {
+        throw new Error(`No se pudo exportar (${resp.status})`);
+      }
+      const blob = await resp.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `customers-${user.id}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'No se pudo exportar CSV';
+      toast.error(msg);
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleNewCustomer = () => {
@@ -161,14 +272,46 @@ export default function CustomersPage() {
       name: '',
       email: '',
       phone: '',
+      address: '',
       status: 'Active',
     });
   };
 
   const handleSubmitNewCustomer = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    console.log('Crear cliente:', newCustomer);
-    handleCloseModal();
+    if (!selectedBusinessId) {
+      toast.error('Selecciona un negocio para crear el cliente.');
+      return;
+    }
+    const payload: any = {
+      name: newCustomer.name.trim(),
+      email: newCustomer.email.trim() || undefined,
+      phone: newCustomer.phone.trim(),
+      business_id: selectedBusinessId,
+    };
+    if (newCustomer.address.trim()) {
+      payload.address = { address: newCustomer.address.trim() };
+    }
+
+    if (!payload.name || !payload.phone) {
+      toast.error('Nombre y teléfono son obligatorios.');
+      return;
+    }
+
+    setSubmitting(true);
+    customerService
+      .create(payload)
+      .then(() => {
+        toast.success('Cliente creado');
+        handleCloseModal();
+        fetchCustomers();
+      })
+      .catch((err) => {
+        const msg =
+          err instanceof Error ? err.message : 'No se pudo crear el cliente';
+        toast.error(msg);
+      })
+      .finally(() => setSubmitting(false));
   };
 
   // Agregar isExpanded a cada cliente
@@ -201,10 +344,11 @@ export default function CustomersPage() {
         <div className="flex gap-3">
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 h-11 bg-white border border-primary/20 rounded-lg text-[#181411] text-sm font-bold hover:bg-primary/5 transition-colors"
+            className="flex items-center gap-2 px-4 h-11 bg-white border border-primary/20 rounded-lg text-[#181411] text-sm font-bold hover:bg-primary/5 transition-colors disabled:opacity-60"
+            disabled={exporting || loading}
           >
             <span className="material-symbols-outlined text-lg">download</span>
-            Exportar CSV
+            {exporting ? 'Exportando...' : 'Exportar CSV'}
           </button>
           <button
             onClick={handleNewCustomer}
@@ -220,11 +364,26 @@ export default function CustomersPage() {
       <CustomerStats stats={stats} />
 
       {/* Main CRM Table Card */}
-      <CustomerTable
-        customers={customersWithExpanded}
-        onToggleExpand={handleToggleExpand}
-        onViewProfile={handleViewProfile}
-      />
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+          {error}
+        </div>
+      )}
+      {loading ? (
+        <div className="bg-white border border-primary/10 rounded-lg px-4 py-3 text-sm text-[#8a7560]">
+          Cargando clientes...
+        </div>
+      ) : customersWithExpanded.length === 0 ? (
+        <div className="bg-white border border-primary/10 rounded-lg px-4 py-3 text-sm text-[#8a7560]">
+          No hay clientes para mostrar.
+        </div>
+      ) : (
+        <CustomerTable
+          customers={customersWithExpanded}
+          onToggleExpand={handleToggleExpand}
+          onViewProfile={handleViewProfile}
+        />
+      )}
 
       {/* Modal Crear Cliente */}
       {isModalOpen && (
@@ -251,6 +410,23 @@ export default function CustomersPage() {
             </div>
 
             <form className="space-y-4" onSubmit={handleSubmitNewCustomer}>
+              <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
+                Negocio
+                <select
+                  required
+                  value={selectedBusinessId}
+                  onChange={(e) => setSelectedBusinessId(e.target.value)}
+                  className="h-11 px-3 rounded-lg border border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm text-[#181411] bg-white"
+                >
+                  <option value="">Selecciona un negocio</option>
+                  {businessOptions.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
                   Nombre completo
@@ -295,6 +471,21 @@ export default function CustomersPage() {
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
+                  Dirección (opcional)
+                  <input
+                    type="text"
+                    value={newCustomer.address}
+                    onChange={(e) =>
+                      setNewCustomer((prev) => ({ ...prev, address: e.target.value }))
+                    }
+                    className="h-11 px-3 rounded-lg border border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm text-[#181411]"
+                    placeholder="Calle, número, comuna"
+                  />
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
                   Estado
                   <select
                     value={newCustomer.status}
@@ -320,9 +511,10 @@ export default function CustomersPage() {
                 </button>
                 <button
                   type="submit"
-                  className="h-11 px-4 rounded-lg bg-primary text-white text-sm font-bold hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
+                  className="h-11 px-4 rounded-lg bg-primary text-white text-sm font-bold hover:opacity-90 transition-opacity shadow-lg shadow-primary/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                  disabled={submitting}
                 >
-                  Guardar cliente
+                  {submitting ? 'Creando...' : 'Guardar cliente'}
                 </button>
               </div>
             </form>

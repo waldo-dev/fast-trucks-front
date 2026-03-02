@@ -63,6 +63,8 @@ export const userService = {
   list: () => api.get("users", { auth: true }),
   listByBusiness: (businessId: string | number) =>
     api.get(`users/business/${businessId}`, { auth: true }),
+  listByUser: (userId: string | number) =>
+    api.get(`users/by-user/${userId}`, { auth: true }),
   listAdminsOwners: (params?: { business_id?: string | number }) =>
     api.get(`users/admins-owners${qs(params)}`, { auth: true }),
   get: (id: string | number) => api.get(`users/${id}`, { auth: true }),
@@ -230,9 +232,9 @@ export const locationService = {
 
 export const eventService = {
   list: (params?: { future?: boolean }) =>
-    api.get(`/events${qs(params)}`, { auth: true }),
-  get: (id: string | number) => api.get(`/events/${id}`, { auth: true }),
-  create: (data: unknown) => api.post("/events", data, { auth: true }),
+    api.get(`events${qs(params)}`, { auth: true }),
+  get: (id: string | number) => api.get(`events/${id}`, { auth: true }),
+  create: (data: unknown) => api.post("events", data, { auth: true }),
 };
 
 export const orderService = {
@@ -241,10 +243,20 @@ export const orderService = {
     order_source?: string;
     customer_id?: string | number;
   }) => api.get(`orders${qs(params)}`, { auth: true }),
+  history: (params?: {
+    start_date?: string;
+    end_date?: string;
+    status?: string;
+    order_source?: string;
+    customer_id?: string | number;
+    business_id?: string | number;
+  }) => api.get(`orders/history${qs(params)}`, { auth: true }),
+  listByUser: (userId: string | number) =>
+    api.get(`orders/by-user/${userId}`, { auth: true }),
   get: (id: string | number) => api.get(`orders/${id}`, { auth: true }),
   create: (data: unknown) => api.post("orders", data, { auth: true }),
   updateStatus: (id: string | number, data: unknown) =>
-    api.post(`orders/${id}/status`, data, { auth: true }),
+    api.patch(`orders/${id}/status`, data, { auth: true }),
   remove: (id: string | number) => api.delete(`orders/${id}`, { auth: true }),
 };
 
@@ -260,30 +272,39 @@ export const paymentConfigService = {
 };
 
 export const customerService = {
-  sendOtp: (data: unknown) => api.post("/customers/otp/send", data),
-  verifyOtp: (data: unknown) => api.post("/customers/otp/verify", data),
+  sendOtp: (data: unknown) => api.post("customers/otp/send", data),
+  verifyOtp: (data: unknown) => api.post("customers/otp/verify", data),
   list: (params?: { business_id?: string | number }) =>
-    api.get(`/customers${qs(params)}`),
+    api.get(`customers${qs(params)}`),
+  create: (data: {
+    name: string;
+    phone: string;
+    email?: string;
+    business_id: string | number;
+    address?: { address: string; notes?: string };
+  }) => api.post("customers", data, { auth: true }),
+  listByUser: (userId: string | number) =>
+    api.get(`customers/by-user/${userId}`, { auth: true }),
   get: (id: string | number, params?: { business_id?: string | number }) =>
-    api.get(`/customers/${id}${qs(params)}`),
+    api.get(`customers/${id}${qs(params)}`),
   update: (id: string | number, data: unknown) =>
-    api.put(`/customers/${id}`, data),
-  remove: (id: string | number) => api.delete(`/customers/${id}`),
+    api.put(`customers/${id}`, data),
+  remove: (id: string | number) => api.delete(`customers/${id}`),
 
   // Direcciones
   listAddresses: (customerId: string | number) =>
-    api.get(`/customers/${customerId}/addresses`),
+    api.get(`customers/${customerId}/addresses`),
   getAddress: (customerId: string | number, addressId: string | number) =>
-    api.get(`/customers/${customerId}/addresses/${addressId}`),
+    api.get(`customers/${customerId}/addresses/${addressId}`),
   createAddress: (customerId: string | number, data: unknown) =>
-    api.post(`/customers/${customerId}/addresses`, data),
+    api.post(`customers/${customerId}/addresses`, data),
   updateAddress: (
     customerId: string | number,
     addressId: string | number,
     data: unknown,
-  ) => api.put(`/customers/${customerId}/addresses/${addressId}`, data),
+  ) => api.put(`customers/${customerId}/addresses/${addressId}`, data),
   updateAddressById: (id: string | number, data: unknown) =>
-    api.put(`/customers/addresses/${id}`, data),
+    api.put(`customers/addresses/${id}`, data),
   removeAddress: (customerId: string | number, addressId: string | number) =>
-    api.delete(`/customers/${customerId}/addresses/${addressId}`),
+    api.delete(`customers/${customerId}/addresses/${addressId}`),
 };
