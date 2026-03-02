@@ -20,6 +20,11 @@ export const businessService = {
   update: (id: string | number, data: unknown) =>
     api.put(`business/${id}`, data, { auth: true }),
   remove: (id: string | number) => api.delete(`business/${id}`, { auth: true }),
+  dashboardOverview: () => api.get("business/dashboard/overview", { auth: true }),
+  dashboardRecentOrders: () =>
+    api.get("business/dashboard/recent-orders", { auth: true }),
+  dashboardTopBusinesses: () =>
+    api.get("business/dashboard/top-businesses", { auth: true }),
   createWithLogo: (payload: {
     name: string;
     brand_name: string;
@@ -251,6 +256,8 @@ export const orderService = {
     customer_id?: string | number;
     business_id?: string | number;
   }) => api.get(`orders/history${qs(params)}`, { auth: true }),
+  closeout: (params?: { start_date?: string; end_date?: string; vat_rate?: number }) =>
+    api.get(`orders/closeout${qs(params)}`, { auth: true }),
   listByUser: (userId: string | number) =>
     api.get(`orders/by-user/${userId}`, { auth: true }),
   get: (id: string | number) => api.get(`orders/${id}`, { auth: true }),
@@ -269,6 +276,14 @@ export const paymentService = {
 export const paymentConfigService = {
   listActive: () => api.get("/payment-configs", { auth: true }),
   create: (data: unknown) => api.post("/payment-configs", data, { auth: true }),
+};
+
+export const mailingService = {
+  dashboard: () => api.get("mailing/dashboard", { auth: true }),
+  listCampaigns: (params?: { page?: number; page_size?: number }) =>
+    api.get(`mailing/campaigns${qs(params)}`, { auth: true }),
+  createCampaign: (data: unknown) => api.post("mailing/campaigns", data, { auth: true }),
+  sendBulk: (data: unknown) => api.post("mailing/send", data, { auth: true }),
 };
 
 export const customerService = {

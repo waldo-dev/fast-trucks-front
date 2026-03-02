@@ -1,25 +1,48 @@
 import React from 'react';
 import Link from 'next/link';
 
+type OrderStatus =
+  | 'CREATED'
+  | 'CONFIRMED'
+  | 'PREPARING'
+  | 'READY'
+  | 'DELIVERED'
+  | 'CANCELLED'
+  | 'NEW'
+  | string;
+
 interface Order {
   id: string;
   venue: string;
   customer: string;
   amount: string;
-  status: 'Preparando' | 'Nuevo';
+  status: OrderStatus;
 }
 
 interface RecentOrdersTableProps {
   orders: Order[];
 }
 
+const statusMeta = (status: OrderStatus) => {
+  const normalized = status?.toString().toUpperCase();
+  switch (normalized) {
+    case 'PREPARING':
+    case 'CONFIRMED':
+      return { label: 'Preparando', className: 'bg-emerald-100 text-emerald-700' };
+    case 'READY':
+      return { label: 'Listo', className: 'bg-blue-100 text-blue-700' };
+    case 'DELIVERED':
+      return { label: 'Entregado', className: 'bg-slate-200 text-slate-700' };
+    case 'CANCELLED':
+      return { label: 'Cancelado', className: 'bg-red-100 text-red-700' };
+    case 'CREATED':
+    case 'NEW':
+    default:
+      return { label: 'Nuevo', className: 'bg-blue-100 text-blue-700' };
+  }
+};
+
 export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ orders }) => {
-  const getStatusClass = (status: string) => {
-    if (status === 'Preparando') {
-      return 'bg-emerald-100 text-emerald-700';
-    }
-    return 'bg-blue-100 text-blue-700';
-  };
 
   return (
     <div className="xl:col-span-2 bg-white dark:bg-[#2d2419] rounded-xl shadow-sm border border-[#e6e0db] overflow-hidden">
@@ -66,11 +89,11 @@ export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ orders }) 
                 <td className="px-6 py-4 text-sm dark:text-[#a3907d]">{order.amount}</td>
                 <td className="px-6 py-4">
                   <span
-                    className={`px-3 py-1 text-xs font-bold rounded-full ${getStatusClass(
-                      order.status
-                    )}`}
+                    className={`px-3 py-1 text-xs font-bold rounded-full ${
+                      statusMeta(order.status).className
+                    }`}
                   >
-                    {order.status}
+                    {statusMeta(order.status).label}
                   </span>
                 </td>
               </tr>

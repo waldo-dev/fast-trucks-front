@@ -57,12 +57,51 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
       : item
   );
 
+  const resolveOwnerItems = () => {
+    const byHref = (href: string) =>
+      [
+        ...contextAwareOperatorItems,
+        ...SIDEBAR_ITEMS,
+        USERS_SIDEBAR_ITEM,
+      ].find((i) => i.href === href);
+
+    const orderedHrefs = [
+      '/', // Inicio
+      '/pos',
+      '/pos/pedidos-activos',
+      '/pos/historial',
+      '/pos/cierre-caja',
+      '/pos/cambiar-evento',
+      '/orders',
+      '/customers',
+      '/products',
+      '/promotions',
+      '/payments',
+      '/events',
+      '/outlets',
+      '/mailing',
+      '/users',
+    ];
+
+    const seen = new Set<string>();
+    const ordered = orderedHrefs
+      .map((href) => {
+        const item = byHref(href);
+        if (!item || seen.has(href)) return null;
+        seen.add(href);
+        return item;
+      })
+      .filter(Boolean) as typeof SIDEBAR_ITEMS;
+
+    return ordered;
+  };
+
   const sidebarItems = isAdmin
     ? [...ADMIN_SIDEBAR_ITEMS, ADMIN_USERS_SIDEBAR_ITEM]
     : isOperator
     ? contextAwareOperatorItems
     : isOwner
-    ? [...contextAwareOperatorItems, ...SIDEBAR_ITEMS, USERS_SIDEBAR_ITEM]
+    ? resolveOwnerItems()
     : SIDEBAR_ITEMS;
 
   useEffect(() => {
