@@ -13,19 +13,16 @@ export const LoginHero = () => {
       />
       <div className="absolute inset-0 food-overlay flex flex-col justify-end p-12 lg:p-20">
         <div className="max-w-xl">
-          <div className="flex items-center gap-2 mb-6">
-            <div className="bg-primary p-2 rounded-lg text-white">
-              <Image
-                src="/logo-blanco-sinfondo.png"
-                alt="Operfoods"
-                width={36}
-                height={36}
-                className="rounded-md"
-                priority
-              />
-            </div>
-            <span className="text-white text-2xl font-bold tracking-tight">Operfoods</span>
-          </div>
+        <div className="flex items-center gap-2 mb-6">
+          <Image
+            src="/logo-operfoods-4.svg"
+            alt="Operfoods"
+            width={240}
+            height={240}
+            className="rounded-md"
+            priority
+          />
+        </div>
           <h1 className="text-white text-5xl lg:text-6xl font-extrabold leading-tight mb-4">
             Gestiona tu sabor, en cualquier lugar.
           </h1>

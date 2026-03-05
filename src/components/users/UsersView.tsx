@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { businessService, userService } from '@/lib/services';
 import { toast } from 'react-toastify';
 import { getCachedUser } from '@/lib/auth';
+import { OWNER_ROLES } from '@/lib/constants';
 
 type NormalizedUser = {
   id: string;
@@ -60,7 +61,7 @@ export const UsersView = ({ scope }: UsersViewProps) => {
   const roleLabel = (role?: string) => {
     const r = (role || '').toUpperCase();
     if (r === 'ADMIN') return 'Admin';
-    if (r === 'BUSINESS_OWNER') return 'Dueño de negocio';
+    if (OWNER_ROLES.includes(r as (typeof OWNER_ROLES)[number])) return 'Dueño de negocio';
     if (r === 'LOCAL_OPERATOR') return 'Operador de local';
     return role || 'N/A';
   };

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -46,6 +47,14 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
   const isAdmin = role === 'ADMIN';
   const isOperator = role === 'LOCAL_OPERATOR';
   const isOwner = role ? OWNER_ROLES.includes(role as (typeof OWNER_ROLES)[number]) : false;
+
+  const roleLabel = (value?: string) => {
+    const upper = (value || '').toUpperCase();
+    if (upper === 'ADMIN') return 'Admin';
+    if (OWNER_ROLES.includes(upper as (typeof OWNER_ROLES)[number])) return 'Dueño de negocio';
+    if (upper === 'LOCAL_OPERATOR') return 'Operador de local';
+    return value || 'Administrador';
+  };
 
   useEffect(() => {
     setOperatingContext(readOperatingContext());
@@ -141,40 +150,20 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         } w-72 lg:w-64 flex-shrink-0 border-r border-[#e6e0db] bg-white dark:bg-[#2d2419] h-screen lg:min-h-screen flex flex-col`}
       >
-        <div className="p-6 flex items-center gap-3 border-b border-[#f5f2f0]">
-          <div className="bg-primary flex items-center justify-center rounded-lg size-10 text-white">
-            <span className="material-symbols-outlined">fastfood</span>
+        <div className="p-6 flex flex-col gap-3 border-b border-[#f5f2f0]">
+          <div className="flex items-center">
+            <Image
+              src="/Logo-operfoods-1.svg"
+              alt={APP_NAME}
+              width={160}
+              height={48}
+              priority
+              className="h-10 w-auto"
+            />
           </div>
-          <div className="flex flex-col flex-1 min-w-0">
-            <h1 className="text-[#181411] dark:text-white text-base font-bold leading-tight truncate">
-              {APP_NAME}
-            </h1>
-            <p className="text-[#8a7560] dark:text-[#a3907d] text-xs font-normal">
-              {isAdmin ? 'Panel Admin Global' : isOperator ? 'Terminal POS' : 'Panel Administrador'}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              className="p-2 rounded-lg hover:bg-primary/10 text-[#8a7560] transition-colors relative"
-              aria-label="Alertas"
-            >
-              <span className="material-symbols-outlined">notifications</span>
-              <span className="absolute top-1 right-1 size-2 bg-red-500 rounded-full border-2 border-white"></span>
-            </button>
-            <button
-              className="p-2 rounded-lg hover:bg-primary/10 text-[#8a7560] transition-colors"
-              aria-label="Configuración"
-            >
-              <span className="material-symbols-outlined">settings</span>
-            </button>
-            <button
-              className="lg:hidden p-2 rounded-lg hover:bg-primary/10 text-[#8a7560] transition-colors"
-              onClick={onClose}
-              aria-label="Cerrar menú"
-            >
-              <span className="material-symbols-outlined">close</span>
-            </button>
-          </div>
+          <p className="text-[#8a7560] dark:text-[#a3907d] text-xs font-medium">
+            {isAdmin ? 'Panel Admin Global' : isOperator ? 'Terminal POS' : 'Panel Administrador'}
+          </p>
         </div>
 
         <nav className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
@@ -216,7 +205,7 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
                   {user?.name || 'Admin'}
                 </span>
                 <span className="text-xs text-[#8a7560]">
-                  {role || 'Administrador'}
+                  {roleLabel(role)}
                 </span>
               </div>
             </div>

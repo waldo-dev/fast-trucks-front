@@ -1,4 +1,4 @@
-export const APP_NAME = 'Operfoodss';
+export const APP_NAME = 'Operfoods';
 
 export const SIDEBAR_ITEMS = [
   {
@@ -81,7 +81,7 @@ export const ADMIN_SIDEBAR_ITEMS = [
     icon: 'event_available',
   },
   {
-    title: 'Operfoodss IA',
+    title: 'Operfoods IA',
     href: '/admin/ia',
     icon: 'psychology',
   },
