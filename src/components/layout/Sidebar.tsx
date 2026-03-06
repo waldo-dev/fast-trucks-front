@@ -10,6 +10,7 @@ import {
   OPERATOR_SIDEBAR_ITEMS,
   USERS_SIDEBAR_ITEM,
   ADMIN_USERS_SIDEBAR_ITEM,
+  INVENTORY_SIDEBAR_ITEM,
   OWNER_ROLES,
   APP_NAME,
 } from '@/lib/constants';
@@ -70,9 +71,12 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
 
   const resolveOwnerItems = (): SidebarItem[] => {
     const byHref = (href: string): SidebarItem | undefined =>
-      [...contextAwareOperatorItems, ...SIDEBAR_ITEMS, USERS_SIDEBAR_ITEM].find(
-        (i) => i.href === href
-      );
+      [
+        ...contextAwareOperatorItems,
+        ...SIDEBAR_ITEMS,
+        USERS_SIDEBAR_ITEM,
+        INVENTORY_SIDEBAR_ITEM,
+      ].find((i) => i.href === href);
 
     const orderedHrefs = [
       '/', // Inicio
@@ -89,6 +93,7 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
       '/events',
       '/outlets',
       '/mailing',
+      '/inventory',
       '/users',
     ];
 

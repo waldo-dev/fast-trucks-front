@@ -61,6 +61,11 @@ export const ADMIN_SIDEBAR_ITEMS = [
     icon: 'dashboard',
   },
   {
+    title: 'Inventario',
+    href: '/admin/inventario',
+    icon: 'inventory_2',
+  },
+  {
     title: 'Negocios',
     href: '/admin/negocios',
     icon: 'apartment',
@@ -101,6 +106,12 @@ export const ADMIN_USERS_SIDEBAR_ITEM = {
   title: 'Usuarios',
   href: '/admin/usuarios',
   icon: 'group',
+} as const;
+
+export const INVENTORY_SIDEBAR_ITEM = {
+  title: 'Inventario',
+  href: '/inventory',
+  icon: 'inventory_2',
 } as const;
 
 export const OPERATOR_SIDEBAR_ITEMS = [
