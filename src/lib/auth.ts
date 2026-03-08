@@ -197,8 +197,17 @@ export const getCurrentUser = async (): Promise<StoredUser | null> => {
       user: mapped,
     });
     return mapped;
-  } catch {
-    // Si falla la API, intenta devolver el usuario guardado para no romper la UI
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    const isUnauthorized = message.includes('401');
+
+    if (isUnauthorized) {
+      clearStoredSession();
+      // Fuerza al guard a redirigir cuando el token expira o es inválido
+      throw new Error('Sesión expirada, vuelve a iniciar sesión');
+    }
+
+    // Si falla por otra razón (network) intenta devolver el cache
     return getStoredUser();
   }
 };

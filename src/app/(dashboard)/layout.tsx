@@ -30,7 +30,11 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        await getCurrentUser();
+        const user = await getCurrentUser();
+        if (!user) {
+          redirectToLogin();
+          return;
+        }
         if (active) setReady(true);
       } catch {
         redirectToLogin();
