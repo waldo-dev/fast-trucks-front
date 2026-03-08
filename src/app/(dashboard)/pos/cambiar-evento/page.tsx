@@ -15,6 +15,17 @@ type UiEvent = {
   venue?: string;
 };
 
+const toDisplayText = (value: any): string => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (typeof value === 'object') {
+    if ('name' in value && value.name) return String(value.name);
+    if ('title' in value && (value as any).title) return String((value as any).title);
+    if ('address' in value && (value as any).address) return String((value as any).address);
+  }
+  return '';
+};
+
 const formatDate = (iso?: string) => {
   if (!iso) return '—';
   try {
@@ -49,7 +60,14 @@ export default function PosCambiarEventoPage() {
       if (Array.isArray(list)) {
         const dict: Record<string, string> = {};
         list.forEach((b: any) => {
-          if (b?.id) dict[String(b.id)] = b.name || b.brand_name || `Local ${b.id}`;
+          if (b?.id) {
+            const label =
+              toDisplayText(b.name) ||
+              toDisplayText(b.brand_name) ||
+              toDisplayText(b.title) ||
+              `Local ${b.id}`;
+            dict[String(b.id)] = label;
+          }
         });
         setBusinesses(dict);
       }
@@ -70,11 +88,14 @@ export default function PosCambiarEventoPage() {
         if (Array.isArray(list)) {
           const mapped: UiEvent[] = list.map((ev: any, idx: number) => ({
             id: String(ev.id ?? idx + 1),
-            name: ev.name || ev.title || 'Evento',
+            name: toDisplayText(ev.name || ev.title) || 'Evento',
             start: ev.start_date || ev.start || ev.starts_at,
             end: ev.end_date || ev.end || ev.ends_at,
             businessId: ev.business_id ? String(ev.business_id) : undefined,
-            venue: ev.location || ev.venue,
+            venue:
+              toDisplayText(ev.location?.name) ||
+              toDisplayText(ev.location?.address) ||
+              toDisplayText(ev.venue),
           }));
           if (active) setEvents(mapped);
         } else if (active) {

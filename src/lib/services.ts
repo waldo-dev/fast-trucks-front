@@ -31,6 +31,8 @@ export const businessService = {
     primary_color?: string;
     secondary_color?: string;
     logo?: File | Blob;
+    plan_id?: string | number;
+    billing_period?: string;
   }) => {
     const form = new FormData();
     form.append("name", payload.name);
@@ -40,6 +42,10 @@ export const businessService = {
     if (payload.secondary_color)
       form.append("secondary_color", payload.secondary_color);
     if (payload.logo) form.append("logo", payload.logo);
+    if (payload.plan_id !== undefined && payload.plan_id !== null)
+      form.append("plan_id", String(payload.plan_id));
+    if (payload.billing_period)
+      form.append("billing_period", payload.billing_period.toLowerCase());
     return api.postForm("business", form, { auth: true });
   },
   updateWithLogo: (
@@ -62,6 +68,20 @@ export const businessService = {
     if (payload.logo) form.append("logo", payload.logo);
     return api.putForm(`business/${id}`, form, { auth: true });
   },
+};
+
+export const planService = {
+  list: () => api.get("plans", { auth: true }),
+  get: (id: string | number) => api.get(`plans/${id}`, { auth: true }),
+};
+
+export const subscriptionService = {
+  list: (params?: { business_id?: string | number; status?: string }) =>
+    api.get(`subscriptions${qs(params)}`, { auth: true }),
+  create: (data: { business_id: string | number; plan_id: string | number; billing_period?: string }) =>
+    api.post("subscriptions", data, { auth: true }),
+  update: (id: string | number, data: { plan_id?: string | number; billing_period?: string }) =>
+    api.put(`subscriptions/${id}`, data, { auth: true }),
 };
 
 export const userService = {

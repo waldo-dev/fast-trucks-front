@@ -5,6 +5,10 @@ import { orderService } from '@/lib/services';
 import { toast } from 'react-toastify';
 
 type StatusValue = 'ALL' | 'CREATED' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'DELIVERED' | 'CANCELLED';
+type OperatingContext =
+  | { type: 'event'; event_id?: string; event_name?: string; business_id?: string }
+  | { type: 'business'; business_id?: string }
+  | null;
 
 type UiOrder = {
   id: string;
@@ -71,6 +75,19 @@ const emptyCounts: Record<StatusValue, number> = {
   CANCELLED: 0,
 };
 
+const readOperatingContext = (): OperatingContext => {
+  if (typeof window === 'undefined') return null;
+  const raw =
+    localStorage.getItem('business_operating_context') ??
+    sessionStorage.getItem('business_operating_context');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as OperatingContext;
+  } catch {
+    return null;
+  }
+};
+
 const countStatuses = (list: UiOrder[]): Record<StatusValue, number> => {
   const map = { ...emptyCounts };
   list.forEach((o) => {
@@ -79,6 +96,43 @@ const countStatuses = (list: UiOrder[]): Record<StatusValue, number> => {
     map.ALL += 1;
   });
   return map;
+};
+
+const sanitizePhone = (phone?: string) => {
+  if (!phone) return '';
+  if (phone.startsWith('NO_PHONE_')) return '';
+  return phone;
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  WHATSAPP: 'WhatsApp',
+  POS: 'POS',
+  WEB: 'Web',
+  APP: 'App',
+  EVENT: 'Evento',
+  LOCAL: 'Local',
+};
+
+const PAYMENT_LABELS: Record<string, string> = {
+  CASH: 'Efectivo',
+  CARD: 'Tarjeta',
+  CREDIT_CARD: 'Tarjeta crédito',
+  DEBIT_CARD: 'Tarjeta débito',
+  TRANSFER: 'Transferencia',
+  WEBPAY: 'Webpay',
+  OTHER: 'Otro',
+};
+
+const formatSourceLabel = (src?: string) => {
+  if (!src) return '—';
+  const key = src.toUpperCase();
+  return SOURCE_LABELS[key] || key.charAt(0) + key.slice(1).toLowerCase();
+};
+
+const formatPaymentLabel = (pay?: string) => {
+  if (!pay) return '—';
+  const key = pay.toUpperCase();
+  return PAYMENT_LABELS[key] || key.charAt(0) + key.slice(1).toLowerCase();
 };
 
 export default function PosPedidosActivosPage() {
@@ -91,13 +145,25 @@ export default function PosPedidosActivosPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const pageSize = 10;
+  const [operatingContext] = useState<OperatingContext>(() => readOperatingContext());
+  const [eventFilterId] = useState<string | null>(() => {
+    const ctx = readOperatingContext();
+    return ctx?.type === 'event' && ctx.event_id ? String(ctx.event_id) : null;
+  });
+  const [businessFilterId] = useState<string | null>(() => {
+    const ctx = readOperatingContext();
+    return ctx?.type === 'business' && ctx.business_id ? String(ctx.business_id) : null;
+  });
 
   useEffect(() => {
     const loadOrders = async () => {
       setLoading(true);
       setError(null);
       try {
-        const params = status === 'ALL' ? undefined : { status };
+        const params: any = {};
+        if (status !== 'ALL') params.status = status;
+        if (eventFilterId) params.event_id = eventFilterId;
+        else if (businessFilterId) params.business_id = businessFilterId;
         const resp = await orderService.list(params as any);
         const list = (resp as any)?.data ?? resp;
         if (Array.isArray(list)) {
@@ -110,7 +176,7 @@ export default function PosPedidosActivosPage() {
             source: (o.order_source || o.source || 'WHATSAPP').toUpperCase(),
             paymentType: o.payment_type || o.paymentMethod || undefined,
             customerName: o.customer?.name || 'Sin nombre',
-            customerPhone: o.customer?.phone || '—',
+            customerPhone: sanitizePhone(o.customer?.phone) || '—',
             address:
               o.address?.address ||
               o.delivery_address ||
@@ -136,7 +202,7 @@ export default function PosPedidosActivosPage() {
     };
 
     loadOrders();
-  }, [status, refreshKey]);
+  }, [status, refreshKey, eventFilterId]);
 
   useEffect(() => {
     setPage(1);
@@ -146,7 +212,13 @@ export default function PosPedidosActivosPage() {
   useEffect(() => {
     const loadAllCounts = async () => {
       try {
-        const resp = await orderService.list();
+        const resp = await orderService.list(
+          eventFilterId
+            ? ({ event_id: eventFilterId } as any)
+            : businessFilterId
+              ? ({ business_id: businessFilterId } as any)
+              : undefined
+        );
         const list = (resp as any)?.data ?? resp;
         if (Array.isArray(list)) {
           const mapped: UiOrder[] = list.map((o: any) => ({
@@ -181,7 +253,7 @@ export default function PosPedidosActivosPage() {
     };
 
     loadAllCounts();
-  }, [refreshKey]);
+  }, [refreshKey, eventFilterId]);
 
   const displayedOrders = useMemo(() => {
     if (status === 'ALL') return orders;
@@ -198,6 +270,15 @@ export default function PosPedidosActivosPage() {
 
   const handlePrev = () => setPage((prev) => Math.max(1, prev - 1));
   const handleNext = () => setPage((prev) => Math.min(totalPages, prev + 1));
+
+  const contextLabel =
+    operatingContext?.type === 'event' && operatingContext.event_name
+      ? `Evento: ${operatingContext.event_name}`
+      : eventFilterId
+      ? `Evento ID: ${eventFilterId}`
+      : businessFilterId
+        ? `Local ID: ${businessFilterId}`
+        : 'Modo local';
 
   const handleStatusChange = async (orderId: string, nextStatus: StatusValue) => {
     if (!nextStatus || nextStatus === 'ALL') return;
@@ -228,6 +309,25 @@ export default function PosPedidosActivosPage() {
             <p className="text-sm text-gray-600">
               Visualiza, filtra y monitorea los pedidos en curso. Usa los estados para acotar la vista.
             </p>
+            <div className="flex items-center gap-2 mt-2">
+              <span
+                className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-semibold ${
+                  eventFilterId
+                    ? 'bg-primary/10 text-primary border-primary/30'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                }`}
+              >
+                <span className="material-symbols-outlined text-sm">
+                  {eventFilterId ? 'event' : 'store'}
+                </span>
+                {contextLabel}
+              </span>
+              {eventFilterId && (
+                <span className="text-[11px] text-gray-600 bg-gray-100 border border-gray-200 px-2 py-1 rounded-md">
+                  Filtrando por evento de contexto
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -337,9 +437,9 @@ export default function PosPedidosActivosPage() {
                           );
                         })()}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{o.source}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{formatSourceLabel(o.source)}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        {o.paymentType ? o.paymentType.toUpperCase() : '—'}
+                        {formatPaymentLabel(o.paymentType)}
                       </td>
                       <td className="px-4 py-3 font-semibold text-gray-900">{formatClp(o.total)}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{formatDate(o.createdAt)}</td>
@@ -394,10 +494,10 @@ export default function PosPedidosActivosPage() {
                         {o.type === 'DELIVERY' ? 'Delivery' : 'Retiro'}
                       </span>
                       <span className="px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                        {o.source}
+                        {formatSourceLabel(o.source)}
                       </span>
                       <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">
-                        {o.paymentType ? o.paymentType.toUpperCase() : '—'}
+                        {formatPaymentLabel(o.paymentType)}
                       </span>
                     </div>
                     <div className="text-sm text-gray-800">

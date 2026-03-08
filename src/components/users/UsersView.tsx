@@ -363,7 +363,7 @@ export const UsersView = ({ scope }: UsersViewProps) => {
             <p className="text-sm text-[#4b5563] dark:text-[#a3907d]">{scopeCopy}</p>
           </div>
           <span className="text-xs font-semibold text-[#8a7560] bg-[#f5f2f0] px-3 py-1 rounded-full">
-            Rol actual: {cachedRole || '—'}
+            Rol actual: {roleLabel(cachedRole) || '—'}
           </span>
         </div>
       </header>

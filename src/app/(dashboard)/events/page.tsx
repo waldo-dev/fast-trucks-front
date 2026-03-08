@@ -23,6 +23,58 @@ type UiEvent = {
 };
 
 const EVENT_TYPES = ['Clientes (B2C)', 'Empresas (B2B)'];
+const STATUS_OPTIONS = ['PLANNED', 'ACTIVE', 'IN_PROGRESS', 'COMPLETED', 'CANCELED'];
+const STATUS_LABELS: Record<string, string> = {
+  PLANNED: 'Planeado',
+  ACTIVE: 'Activo',
+  IN_PROGRESS: 'En progreso',
+  COMPLETED: 'Completado',
+  CANCELED: 'Cancelado',
+};
+const WEATHER_OPTIONS = [
+  'Soleado',
+  'Parcialmente nublado',
+  'Nublado',
+  'Lloviendo',
+  'Tormenta',
+  'Ventoso',
+  'Nevando',
+  'Húmedo',
+];
+const ORGANIZER_ROLES = [
+  'Productora',
+  'Coordinación',
+  'Operaciones',
+  'Logística',
+  'Marketing',
+  'Ventas',
+  'Finanzas',
+  'Otro',
+];
+
+const normalizeStatus = (value?: string) => {
+  if (!value) return '';
+  return value.trim().toUpperCase();
+};
+
+const formatStatusLabel = (value?: string) => {
+  const normalized = normalizeStatus(value);
+  if (!normalized) return '—';
+  if (STATUS_LABELS[normalized]) return STATUS_LABELS[normalized];
+  const prettified = normalized.replace(/_/g, ' ').toLowerCase();
+  return prettified.charAt(0).toUpperCase() + prettified.slice(1);
+};
+
+const toDisplayText = (value: any): string => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (typeof value === 'object') {
+    if ('name' in value && value.name) return String(value.name);
+    if ('title' in value && (value as any).title) return String((value as any).title);
+    if ('address' in value && (value as any).address) return String((value as any).address);
+  }
+  return '';
+};
 
 const formatDate = (value?: string) => {
   if (!value) return '—';
@@ -78,6 +130,7 @@ export default function EventsPage() {
   >([{ name: '', role: '', email: '', phone: '', notes: '' }]);
   const [products, setProducts] = useState<Array<{ id: number; name: string }>>([]);
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
+  const [productPage, setProductPage] = useState(1);
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
@@ -101,20 +154,30 @@ export default function EventsPage() {
         setEvents(
           data.map((ev: any, idx: number) => ({
             id: String(ev.id ?? idx + 1),
-            name: ev.name || ev.title || 'Evento',
+            name: toDisplayText(ev.name || ev.title) || 'Evento',
             date: normalizeDate(
               ev.event_date || ev.date || ev.start_at || ev.start || ev.starts_at
             ),
             start: ev.start_at || ev.start || ev.starts_at,
             end: ev.end_at || ev.end || ev.ends_at,
-            status: ev.status,
+            status: (() => {
+              const normalized = normalizeStatus(ev.status || (ev as any)?.state);
+              return STATUS_OPTIONS.includes(normalized) ? normalized : '';
+            })(),
             isActive: typeof ev.is_active === 'boolean' ? ev.is_active : undefined,
-            city: ev.city,
-            district: ev.district,
-            address: ev.address || ev.location?.address,
-            organizer: ev.organizer,
-            organizers: ev.organizers,
-            eventType: ev.event_type,
+            city: toDisplayText(ev.city),
+            district: toDisplayText(ev.district),
+            address: toDisplayText(ev.address || ev.location?.address),
+            organizer: toDisplayText(ev.organizer),
+            organizers: Array.isArray(ev.organizers)
+              ? ev.organizers.map((o: any) => ({
+                  name: toDisplayText(o?.name ?? o),
+                  role: toDisplayText(o?.role),
+                  email: toDisplayText(o?.email),
+                  phone: toDisplayText(o?.phone),
+                }))
+              : undefined,
+            eventType: toDisplayText(ev.event_type),
             expectedAttendance: ev.expected_attendance,
           }))
         );
@@ -150,7 +213,11 @@ export default function EventsPage() {
           setProducts(
             list.map((p: any) => ({
               id: Number(p.id),
-              name: p.name || `Producto ${p.id}`,
+              name:
+                toDisplayText(p.name) ||
+                toDisplayText(p.title) ||
+                toDisplayText(p?.location?.name) ||
+                `Producto ${p.id}`,
             }))
           );
         }
@@ -161,6 +228,47 @@ export default function EventsPage() {
     loadProducts();
   }, []);
 
+  const statusOptions = STATUS_OPTIONS;
+
+  useEffect(() => {
+    setProductPage(1);
+  }, [products]);
+
+  const productPageSize = 8;
+  const totalProductPages = Math.max(1, Math.ceil(products.length / productPageSize));
+  const currentProductPage = Math.min(productPage, totalProductPages);
+
+  const paginatedProducts = useMemo(() => {
+    const start = (currentProductPage - 1) * productPageSize;
+    return products.slice(start, start + productPageSize);
+  }, [products, currentProductPage, productPageSize]);
+
+  const allProductsSelected =
+    products.length > 0 && products.every((p) => selectedProductIds.includes(p.id));
+  const allPageProductsSelected =
+    paginatedProducts.length > 0 &&
+    paginatedProducts.every((p) => selectedProductIds.includes(p.id));
+
+  const toggleSelectAllProducts = () => {
+    setSelectedProductIds((prev) => {
+      if (allProductsSelected) {
+        const pageIds = new Set(products.map((p) => p.id));
+        return prev.filter((id) => !pageIds.has(id));
+      }
+      return Array.from(new Set([...prev, ...products.map((p) => p.id)]));
+    });
+  };
+
+  const toggleSelectAllPageProducts = () => {
+    setSelectedProductIds((prev) => {
+      if (allPageProductsSelected) {
+        const pageIds = new Set(paginatedProducts.map((p) => p.id));
+        return prev.filter((id) => !pageIds.has(id));
+      }
+      return Array.from(new Set([...prev, ...paginatedProducts.map((p) => p.id)]));
+    });
+  };
+
   const filteredEvents = useMemo(() => events, [events]);
   const totalPages = Math.max(1, Math.ceil(filteredEvents.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -170,6 +278,8 @@ export default function EventsPage() {
     return filteredEvents.slice(start, start + pageSize);
   }, [filteredEvents, currentPage]);
 
+  const handleProductPrev = () => setProductPage((prev) => Math.max(1, prev - 1));
+  const handleProductNext = () => setProductPage((prev) => Math.min(totalProductPages, prev + 1));
   const handlePrev = () => setPage((prev) => Math.max(1, prev - 1));
   const handleNext = () => setPage((prev) => Math.min(totalPages, prev + 1));
 
@@ -353,7 +463,6 @@ export default function EventsPage() {
                     <th className="px-4 py-3">Organizadores</th>
                     <th className="px-4 py-3">Ciudad / Distrito</th>
                     <th className="px-4 py-3">Estado</th>
-                    <th className="px-4 py-3">Activo</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-primary/10 text-sm text-[#181411]">
@@ -399,16 +508,7 @@ export default function EventsPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3">{ev.status || '—'}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
-                            ev.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'
-                          }`}
-                        >
-                          {ev.isActive ? 'Activo' : 'Inactivo'}
-                        </span>
-                      </td>
+                      <td className="px-4 py-3">{formatStatusLabel(ev.status)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -426,13 +526,6 @@ export default function EventsPage() {
                         <p className="text-xs text-[#8a7560]">Organiza: {ev.organizer}</p>
                       )}
                     </div>
-                    <span
-                      className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
-                        ev.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'
-                      }`}
-                    >
-                      {ev.isActive ? 'Activo' : 'Inactivo'}
-                    </span>
                   </div>
                   <div className="text-sm text-[#181411] space-y-1">
                     <p>
@@ -460,7 +553,7 @@ export default function EventsPage() {
                   </div>
                   <div className="flex items-center justify-between text-xs text-[#181411]">
                     <span className="px-2 py-1 rounded-full bg-primary/10 text-primary font-semibold">
-                      {ev.status || '—'}
+                      {formatStatusLabel(ev.status)}
                     </span>
                     <span className="text-[#8a7560]">{ev.eventType || ''}</span>
                   </div>
@@ -553,7 +646,7 @@ export default function EventsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
-                  Inicio (ISO)
+                  Inicio
                   <input
                     type="datetime-local"
                     value={newEvent.start_at}
@@ -562,7 +655,7 @@ export default function EventsPage() {
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
-                  Fin (ISO)
+                  Fin 
                   <input
                     type="datetime-local"
                     value={newEvent.end_at}
@@ -621,22 +714,18 @@ export default function EventsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
                   Estado
-                  <input
-                    type="text"
+                  <select
                     value={newEvent.status}
                     onChange={(e) => setNewEvent((p) => ({ ...p, status: e.target.value }))}
-                    className="h-10 px-3 rounded-lg border border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm"
-                    placeholder="Ej: PLANNED"
-                  />
-                </label>
-                <label className="flex items-center gap-2 text-sm font-semibold text-[#181411] mt-6">
-                  <input
-                    type="checkbox"
-                    className="accent-primary"
-                    checked={newEvent.is_active}
-                    onChange={(e) => setNewEvent((p) => ({ ...p, is_active: e.target.checked }))}
-                  />
-                  Evento activo
+                    className="h-10 px-3 rounded-lg border border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm bg-white"
+                  >
+                    <option value="">Selecciona estado</option>
+                    {statusOptions.map((s) => (
+                      <option key={s} value={s}>
+                        {formatStatusLabel(s)}
+                      </option>
+                    ))}
+                  </select>
                 </label>
               </div>
 
@@ -663,49 +752,114 @@ export default function EventsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
                   Condición climática
-                  <input
-                    type="text"
+                  <select
                     value={newEvent.weather_condition}
                     onChange={(e) => setNewEvent((p) => ({ ...p, weather_condition: e.target.value }))}
-                    className="h-10 px-3 rounded-lg border border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm"
-                    placeholder="Ej: Soleado"
-                  />
+                    className="h-10 px-3 rounded-lg border border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm bg-white"
+                  >
+                    <option value="">Selecciona condición</option>
+                    {WEATHER_OPTIONS.map((w) => (
+                      <option key={w} value={w}>
+                        {w}
+                      </option>
+                    ))}
+                  </select>
                 </label>
-                <div className="flex flex-col gap-2 text-sm font-semibold text-[#181411]">
-                  <span>Productos</span>
-                  <div className="max-h-40 overflow-y-auto border border-primary/10 rounded-lg p-2 space-y-2 bg-white">
-                    {products.length === 0 ? (
+                <div className="flex flex-col gap-3 text-sm font-semibold text-[#181411] bg-white border border-primary/10 rounded-xl p-3 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <span className="text-[#181411]">Productos</span>
+                    <div className="flex flex-wrap gap-3 text-xs font-medium text-[#6f5b4a]">
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="accent-primary"
+                          checked={allProductsSelected}
+                          onChange={toggleSelectAllProducts}
+                        />
+                        Seleccionar todos
+                      </label>
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="accent-primary"
+                          checked={allPageProductsSelected}
+                          onChange={toggleSelectAllPageProducts}
+                        />
+                        Seleccionar página
+                      </label>
+                    </div>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto border border-primary/10 rounded-lg p-3 bg-primary/5 space-y-2">
+                    {paginatedProducts.length === 0 ? (
                       <span className="text-xs text-[#8a7560]">No hay productos disponibles.</span>
                     ) : (
-                      products.map((p) => {
-                        const checked = selectedProductIds.includes(p.id);
-                        return (
-                          <label
-                            key={p.id}
-                            className="flex items-center gap-2 text-sm font-medium text-[#181411]"
-                          >
-                            <input
-                              type="checkbox"
-                              className="accent-primary"
-                              checked={checked}
-                              onChange={() =>
-                                setSelectedProductIds((prev) =>
-                                  checked ? prev.filter((id) => id !== p.id) : [...prev, p.id]
-                                )
-                              }
-                            />
-                            <span>{p.name}</span>
-                          </label>
-                        );
-                      })
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {paginatedProducts.map((p) => {
+                          const checked = selectedProductIds.includes(p.id);
+                          const displayName = toDisplayText(p.name) || `Producto ${p.id}`;
+                          return (
+                            <label
+                              key={p.id}
+                              className="flex items-center gap-3 text-sm font-medium text-[#181411] bg-white rounded-lg px-3 py-2 border border-primary/10 hover:border-primary/40 transition-colors"
+                            >
+                              <input
+                                type="checkbox"
+                                className="accent-primary"
+                                checked={checked}
+                                onChange={() =>
+                                  setSelectedProductIds((prev) =>
+                                    checked ? prev.filter((id) => id !== p.id) : [...prev, p.id]
+                                  )
+                                }
+                              />
+                              <span className="truncate">{displayName}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
                     )}
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs text-[#8a7560] pt-1 gap-2">
+                    <span>
+                      Mostrando{' '}
+                      <span className="text-[#181411]">
+                        {products.length === 0
+                          ? 0
+                          : (currentProductPage - 1) * productPageSize + 1}
+                        {products.length > 0
+                          ? `-${Math.min(currentProductPage * productPageSize, products.length)}`
+                          : ''}
+                      </span>{' '}
+                      de <span className="text-[#181411]">{products.length}</span> productos
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleProductPrev}
+                        disabled={currentProductPage === 1}
+                        className="px-3 py-1.5 border border-primary/20 rounded-lg font-semibold bg-white text-[#181411] hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Anterior
+                      </button>
+                      <span className="font-medium text-[#181411]">
+                        Página {currentProductPage} de {totalProductPages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleProductNext}
+                        disabled={currentProductPage === totalProductPages}
+                        className="px-3 py-1.5 border border-primary/20 rounded-lg font-semibold bg-white text-[#181411] hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Siguiente
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
-                  Cierre (ISO)
+                  Cierre
                   <input
                     type="datetime-local"
                     value={newEvent.closed_at}
@@ -767,16 +921,22 @@ export default function EventsPage() {
                     </label>
                     <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
                       Rol
-                      <input
-                        type="text"
+                      <select
                         value={org.role}
                         onChange={(e) =>
                           setOrganizers((prev) =>
                             prev.map((o, i) => (i === idx ? { ...o, role: e.target.value } : o))
                           )
                         }
-                        className="h-10 px-3 rounded-lg border border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm"
-                      />
+                        className="h-10 px-3 rounded-lg border border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm bg-white"
+                      >
+                        <option value="">Selecciona rol</option>
+                        {ORGANIZER_ROLES.map((role) => (
+                          <option key={role} value={role}>
+                            {role}
+                          </option>
+                        ))}
+                      </select>
                     </label>
                     <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
                       Email

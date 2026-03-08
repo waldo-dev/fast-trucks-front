@@ -15,24 +15,14 @@ import {
   APP_NAME,
 } from '@/lib/constants';
 import { getCurrentUser, getCachedUser, logout } from '@/lib/auth';
+import { hasFeature, normalizeTier } from '@/lib/planAccess';
+import { readOperatingContext, writeOperatingContext } from '@/lib/operatingContext';
+import { businessService, subscriptionService } from '@/lib/services';
 
 type OperatingContext =
   | { type: 'event'; event_id?: string; event_name?: string; business_id?: string }
   | { type: 'business'; business_id?: string }
   | null;
-
-const readOperatingContext = (): OperatingContext => {
-  if (typeof window === 'undefined') return null;
-  const raw =
-    localStorage.getItem('business_operating_context') ??
-    sessionStorage.getItem('business_operating_context');
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as OperatingContext;
-  } catch {
-    return null;
-  }
-};
 
 interface SidebarProps {
   isMobileOpen?: boolean;
@@ -44,10 +34,14 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
   const router = useRouter();
   const [user, setUser] = useState<Awaited<ReturnType<typeof getCurrentUser>>>(getCachedUser());
   const [operatingContext, setOperatingContext] = useState<OperatingContext>(null);
+  const [businesses, setBusinesses] = useState<Array<{ id: string; name: string; tier?: string }>>([]);
+  const [loadingBiz, setLoadingBiz] = useState(false);
   const role = user?.role?.toUpperCase();
   const isAdmin = role === 'ADMIN';
   const isOperator = role === 'LOCAL_OPERATOR';
   const isOwner = role ? OWNER_ROLES.includes(role as (typeof OWNER_ROLES)[number]) : false;
+  const needsBusinessSelection =
+    !isAdmin && (!operatingContext || operatingContext.type !== 'business' || !operatingContext.business_id);
 
   const roleLabel = (value?: string) => {
     const upper = (value || '').toUpperCase();
@@ -61,6 +55,70 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
     setOperatingContext(readOperatingContext());
   }, []);
 
+  useEffect(() => {
+    const loadBiz = async () => {
+      setLoadingBiz(true);
+      try {
+        const resp = await businessService.list();
+        const list = (resp as any)?.data ?? resp;
+        if (Array.isArray(list)) {
+          setBusinesses(
+            list.map((b: any) => ({
+              id: String(b.id),
+              name: b.name || b.brand_name || `Negocio ${b.id}`,
+            }))
+          );
+          // Autoseleccionar solo si hay un único negocio
+          if (!operatingContext && list.length === 1 && list[0]?.id) {
+            const only = list[0];
+            const ctx: OperatingContext = {
+              type: 'business',
+              business_id: String(only.id),
+              business_name: only.name || only.brand_name,
+            };
+            setOperatingContext(ctx);
+            writeOperatingContext(ctx);
+          }
+        }
+      } catch {
+        // silencio
+      } finally {
+        setLoadingBiz(false);
+      }
+    };
+    loadBiz();
+  }, [operatingContext]);
+
+  const handleSelectBusiness = async (id: string) => {
+    const selected = businesses.find((b) => b.id === id);
+    const ctx: OperatingContext = {
+      type: 'business',
+      business_id: id,
+      business_name: selected?.name,
+    };
+    // Buscar suscripción activa para tier
+    try {
+      const resp = await subscriptionService.list({ business_id: id, status: 'ACTIVE' } as any);
+      const data = (resp as any)?.data ?? resp;
+      const sub = Array.isArray(data) ? data[0] : null;
+      const tier = normalizeTier(sub?.plan?.name ?? sub?.plan_id);
+      if (tier) (ctx as any).planTier = tier;
+    } catch {
+      // silencio
+    }
+    setOperatingContext(ctx);
+    writeOperatingContext(ctx);
+    onClose?.();
+  };
+
+  // Refrescar tier si hay contexto sin tier (ej. cacheado sin plan)
+  useEffect(() => {
+    if (!operatingContext || operatingContext.type !== 'business' || (operatingContext as any).planTier) return;
+    if (!operatingContext.business_id) return;
+    handleSelectBusiness(operatingContext.business_id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [operatingContext?.business_id]);
+
   const contextAwareOperatorItems = OPERATOR_SIDEBAR_ITEMS.map((item) =>
     item.href === '/pos/cambiar-evento' && operatingContext?.type === 'event'
       ? { ...item, title: 'Cambiar Local' }
@@ -70,13 +128,31 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
   type SidebarItem = { title: string; href: string; icon: string };
 
   const resolveOwnerItems = (): SidebarItem[] => {
-    const byHref = (href: string): SidebarItem | undefined =>
-      [
+    const featureByHref: Record<string, Parameters<typeof hasFeature>[0]> = {
+      '/inventory': 'inventory_basic',
+      '/products': 'inventory_basic',
+      '/customers': 'crm',
+      '/orders': 'reports',
+      '/pos/historial': 'reports',
+      '/outlets': 'multi_registers',
+      // '/mailing': 'crm', // no se limita de momento
+    };
+
+    const byHref = (href: string): SidebarItem | undefined => {
+      const item = [
         ...contextAwareOperatorItems,
         ...SIDEBAR_ITEMS,
         USERS_SIDEBAR_ITEM,
         INVENTORY_SIDEBAR_ITEM,
       ].find((i) => i.href === href);
+
+      if (!item) return undefined;
+      const feature = featureByHref[href];
+      const tierFromCtx = (operatingContext as any)?.planTier;
+      const effectiveTier = tierFromCtx || 'BASIC';
+      if (feature && !hasFeature(feature, effectiveTier as any)) return undefined;
+      return item;
+    };
 
     const orderedHrefs = [
       '/', // Inicio
@@ -131,19 +207,44 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
     };
   }, []);
 
-  if (typeof window !== 'undefined') {
-    // eslint-disable-next-line no-console
-    console.log('[Sidebar] role debug', {
-      cached: getCachedUser(),
-      stateUser: user,
-      role,
-      isAdmin,
-      pathname,
-    });
-  }
-
   return (
     <>
+      {!isAdmin && needsBusinessSelection && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center px-4">
+          <div className="bg-white dark:bg-[#2d2419] border border-[#e6e0db] dark:border-[#3d3226] rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-[#181411] dark:text-white">Selecciona un negocio</h3>
+              <p className="text-sm text-[#8a7560] dark:text-[#a3907d]">
+                Necesitamos un negocio activo para aplicar el plan y las restricciones.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <select
+                className="w-full h-11 rounded-lg border border-[#e6e0db] bg-white dark:bg-[#2d2419] dark:border-[#3d3226] px-3 text-sm"
+                value={
+                  operatingContext?.type === 'business' ? operatingContext.business_id : ''
+                }
+                onChange={(e) => handleSelectBusiness(e.target.value)}
+                disabled={loadingBiz}
+              >
+                <option value="" disabled>
+                  {loadingBiz ? 'Cargando...' : 'Selecciona un negocio'}
+                </option>
+                {!loadingBiz && businesses.length === 0 && <option>No hay negocios</option>}
+                {!loadingBiz &&
+                  businesses.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <p className="text-xs text-[#8a7560]">
+              Podrás cambiar de negocio luego desde el selector del sidebar.
+            </p>
+          </div>
+        </div>
+      )}
       <div
         className={`fixed inset-0 z-30 bg-black/40 backdrop-blur-sm transition-opacity duration-200 lg:hidden ${
           isMobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
@@ -169,6 +270,28 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
           <p className="text-[#8a7560] dark:text-[#a3907d] text-xs font-medium">
             {isAdmin ? 'Panel Admin Global' : isOperator ? 'Terminal POS' : 'Panel Administrador'}
           </p>
+          {!isAdmin && (
+            <div className="flex flex-col gap-1 text-xs text-[#4b5563] dark:text-[#a3907d]">
+              <span className="font-semibold text-[#181411] dark:text-white">Negocio activo</span>
+              <select
+                value={
+                  operatingContext?.type === 'business' ? operatingContext.business_id : ''
+                }
+                onChange={(e) => handleSelectBusiness(e.target.value)}
+                className="h-9 rounded-lg border border-[#e6e0db] bg-white dark:bg-[#2d2419] dark:border-[#3d3226] px-2 text-sm"
+                disabled={loadingBiz}
+              >
+                {loadingBiz && <option>Cargando...</option>}
+                {!loadingBiz && businesses.length === 0 && <option>No hay negocios</option>}
+                {!loadingBiz &&
+                  businesses.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <nav className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">

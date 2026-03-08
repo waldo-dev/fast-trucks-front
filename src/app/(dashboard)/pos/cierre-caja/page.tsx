@@ -4,6 +4,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { orderService } from '@/lib/services';
 import { toast } from 'react-toastify';
 
+type OperatingContext =
+  | { type: 'event'; event_id?: string; event_name?: string; business_id?: string }
+  | { type: 'business'; business_id?: string }
+  | null;
+
 type Closeout = {
   gross_sales: number;
   net_sales: number;
@@ -43,6 +48,19 @@ const endOfDayIso = (dateStr: string) => {
   return new Date(`${dateStr}T23:59:59.999`).toISOString();
 };
 
+const readOperatingContext = (): OperatingContext => {
+  if (typeof window === 'undefined') return null;
+  const raw =
+    localStorage.getItem('business_operating_context') ??
+    sessionStorage.getItem('business_operating_context');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as OperatingContext;
+  } catch {
+    return null;
+  }
+};
+
 export default function PosCierreCajaPage() {
   const [startDate, setStartDate] = useState<string>(toInputDate(today));
   const [endDate, setEndDate] = useState<string>(toInputDate(today));
@@ -50,6 +68,7 @@ export default function PosCierreCajaPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<Closeout | null>(null);
+  const [operatingContext, setOperatingContext] = useState<OperatingContext>(null);
 
   const loadCloseout = async () => {
     setLoading(true);
@@ -60,6 +79,9 @@ export default function PosCierreCajaPage() {
         end_date: endOfDayIso(endDate),
         vat_rate: vatRate,
       };
+      if (operatingContext?.type === 'event' && operatingContext.event_id) {
+        (params as any).event_id = operatingContext.event_id;
+      }
       const resp = await orderService.closeout(params as any);
       const payload = (resp as any)?.data ?? resp;
       setData(payload as Closeout);
@@ -73,6 +95,7 @@ export default function PosCierreCajaPage() {
   };
 
   useEffect(() => {
+    setOperatingContext(readOperatingContext());
     loadCloseout();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

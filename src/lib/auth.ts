@@ -7,6 +7,12 @@ type StoredUser = {
   avatar?: string;
   businessId?: string;
   role?: string;
+  subscriptionPlanId?: string;
+  subscriptionPlanName?: string;
+  subscriptionStatus?: string;
+  subscriptionTier?: 'BASIC' | 'STANDARD' | 'PRO';
+  subscriptionTrialEndsAt?: string;
+  subscriptionCurrentPeriodEnd?: string;
 };
 
 type ApiUser = {
@@ -52,7 +58,12 @@ const isBrowser = () => typeof window !== 'undefined';
 
 const mapToStoredUser = (
   user: ApiUser,
-  fallback?: { business_id?: string | number; businessId?: string | number; role?: string }
+  fallback?: {
+    business_id?: string | number;
+    businessId?: string | number;
+    role?: string;
+    subscription?: any;
+  }
 ): StoredUser => {
   const roleValue = user.role ?? fallback?.role;
   const normalizedRole = roleValue ? String(roleValue).toUpperCase() : undefined;
@@ -62,6 +73,21 @@ const mapToStoredUser = (
     fallback?.businessId ??
     (fallback?.business_id ? String(fallback.business_id) : undefined);
 
+  const subscription = (user as any)?.subscription ?? fallback?.subscription;
+  const planIdRaw = subscription?.plan?.id ?? subscription?.plan_id;
+  const planNameRaw = subscription?.plan?.name ?? subscription?.plan_name;
+  const statusRaw = subscription?.status;
+  const normalizeTier = (name?: any, id?: any): 'BASIC' | 'STANDARD' | 'PRO' | undefined => {
+    const lowered = String(name || '').toLowerCase();
+    const idNum = Number(id);
+    if (lowered.includes('basic') || idNum === 1) return 'BASIC';
+    if (lowered.includes('standard') || lowered.includes('estandar') || lowered.includes('estándar') || idNum === 2)
+      return 'STANDARD';
+    if (lowered.includes('pro') || idNum === 3) return 'PRO';
+    return undefined;
+  };
+  const tier = normalizeTier(planNameRaw, planIdRaw);
+
   return {
     id: String(user.id),
     name: user.name,
@@ -69,6 +95,12 @@ const mapToStoredUser = (
     avatar: user.avatar,
     businessId: businessId ? String(businessId) : undefined,
     role: normalizedRole,
+    subscriptionPlanId: planIdRaw !== undefined && planIdRaw !== null ? String(planIdRaw) : undefined,
+    subscriptionPlanName: planNameRaw,
+    subscriptionStatus: statusRaw ? String(statusRaw).toUpperCase() : undefined,
+    subscriptionTier: tier,
+    subscriptionTrialEndsAt: subscription?.trial_ends_at,
+    subscriptionCurrentPeriodEnd: subscription?.current_period_end,
   };
 };
 
@@ -189,7 +221,9 @@ export const getCurrentUser = async (): Promise<StoredUser | null> => {
     if (!response?.success || !response.data) {
       throw new Error('No se pudo obtener el usuario');
     }
-    const mapped = mapToStoredUser(response.data);
+    const mapped = mapToStoredUser(response.data, {
+      subscription: (response as any)?.data?.subscription,
+    });
     // Refresca el cache local sin tocar tokens
     storeSession({
       accessToken: token,

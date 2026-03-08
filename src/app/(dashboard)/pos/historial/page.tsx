@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { businessService, orderService } from '@/lib/services';
+import { businessService, orderService, eventService, customerService } from '@/lib/services';
 import { getCachedUser } from '@/lib/auth';
 import { toast } from 'react-toastify';
 
@@ -15,6 +15,7 @@ type UiOrder = {
   contextLabel: string;
   contextType: 'event' | 'business';
   eventLabel: string;
+  eventId?: string;
   customerName: string;
   total: number;
   createdAt: string;
@@ -30,7 +31,7 @@ const STATUS_OPTIONS = [
   'CANCELLED',
 ];
 
-const SOURCE_OPTIONS = ['WHATSAPP', 'POS', 'WEB', 'APP'];
+type ContextFilter = 'ALL' | 'EVENT' | 'LOCAL';
 
 const formatClp = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -76,11 +77,14 @@ const todayRangeLocal = () => {
 export default function PosHistorialPage() {
   const [businesses, setBusinesses] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedBusiness, setSelectedBusiness] = useState<string>('');
+  const [events, setEvents] = useState<Array<{ id: string; name: string }>>([]);
+  const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
   const [orders, setOrders] = useState<UiOrder[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [status, setStatus] = useState('');
-  const [source, setSource] = useState('');
+  const [contextFilter, setContextFilter] = useState<ContextFilter>('ALL');
+  const [eventId, setEventId] = useState('');
   const [customerId, setCustomerId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,6 +116,51 @@ export default function PosHistorialPage() {
     }
   }, [selectedBusiness]);
 
+  const loadEvents = useCallback(async () => {
+    try {
+      const resp = await eventService.list();
+      const list = (resp as any)?.data ?? resp;
+      if (Array.isArray(list)) {
+        setEvents(
+          list.map((ev: any) => ({
+            id: String(ev.id),
+            name: ev.event_date ? `${ev.name || 'Evento'} · ${ev.event_date}` : ev.name || 'Evento',
+          }))
+        );
+      } else {
+        setEvents([]);
+      }
+    } catch {
+      setEvents([]);
+    }
+  }, []);
+
+  const loadCustomers = useCallback(
+    async (businessId?: string) => {
+      if (!businessId) {
+        setCustomers([]);
+        return;
+      }
+      try {
+        const resp = await customerService.list({ business_id: businessId } as any);
+        const list = (resp as any)?.data ?? resp;
+        if (Array.isArray(list)) {
+          setCustomers(
+            list.map((c: any) => ({
+              id: String(c.id),
+              name: c.name || c.email || c.phone || `Cliente ${c.id}`,
+            }))
+          );
+        } else {
+          setCustomers([]);
+        }
+      } catch {
+        setCustomers([]);
+      }
+    },
+    []
+  );
+
   const fetchOrders = useCallback(async (override?: { start?: string; end?: string }) => {
     if (!selectedBusiness) {
       setOrders([]);
@@ -125,7 +174,10 @@ export default function PosHistorialPage() {
     if (start) params.start_date = new Date(start).toISOString();
     if (end) params.end_date = new Date(end).toISOString();
     if (status) params.status = status;
-    if (source) params.order_source = source;
+    if (contextFilter === 'EVENT') {
+      if (eventId) (params as any).event_id = eventId;
+      else (params as any).order_source = 'EVENT';
+    }
     if (customerId) params.customer_id = customerId;
 
     try {
@@ -151,10 +203,17 @@ export default function PosHistorialPage() {
             : o.has_event
               ? 'Evento'
               : 'Local',
+          eventId: o.event?.id
+            ? String(o.event.id)
+            : o.event_id
+              ? String(o.event_id)
+              : undefined,
           eventLabel: o.event
             ? `${o.event.name || 'Evento'}${o.event.event_date ? ` · ${o.event.event_date}` : ''}`
             : o.has_event
-              ? 'Evento'
+              ? o.event_id
+                ? `Evento #${o.event_id}`
+                : 'Evento'
               : '—',
           customerName: o.customer?.name || 'Sin nombre',
           total: Number(o.total) || 0,
@@ -174,11 +233,25 @@ export default function PosHistorialPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedBusiness, startDate, endDate, status, source, customerId]);
+  }, [selectedBusiness, startDate, endDate, status, contextFilter, eventId, customerId]);
 
   useEffect(() => {
     loadBusinesses();
   }, [loadBusinesses]);
+
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
+
+  useEffect(() => {
+    loadCustomers(selectedBusiness);
+  }, [selectedBusiness, loadCustomers]);
+
+  useEffect(() => {
+    if (contextFilter === 'LOCAL') {
+      setEventId('');
+    }
+  }, [contextFilter]);
 
   useEffect(() => {
     if (!selectedBusiness || startDate || endDate) return;
@@ -190,7 +263,7 @@ export default function PosHistorialPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [selectedBusiness, startDate, endDate, status, source, customerId]);
+  }, [selectedBusiness, startDate, endDate, status, contextFilter, eventId, customerId]);
 
   const statusLabel = (value: string) => {
     switch (value) {
@@ -211,7 +284,18 @@ export default function PosHistorialPage() {
     }
   };
 
-  const filteredOrders = useMemo(() => orders, [orders]);
+  const filteredOrders = useMemo(() => {
+    return orders.filter((o) => {
+      if (contextFilter === 'EVENT') {
+        if (eventId) return o.contextType === 'event' && o.eventId === eventId;
+        return o.contextType === 'event';
+      }
+      if (contextFilter === 'LOCAL') {
+        return o.contextType === 'business';
+      }
+      return true;
+    });
+  }, [orders, contextFilter, eventId]);
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
   const currentPage = Math.min(page, totalPages);
 
@@ -229,7 +313,7 @@ export default function PosHistorialPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a7560]">Terminal POS</p>
         <h1 className="text-2xl font-black text-[#181411] dark:text-white">Historial de Pedidos</h1>
         <p className="text-[#8a7560] dark:text-[#a3907d]">
-          Consulta y filtra pedidos por rango de fechas, estado y canal.
+          Consulta y filtra pedidos por rango de fechas, estado y contexto (evento/local).
         </p>
       </div>
 
@@ -284,31 +368,56 @@ export default function PosHistorialPage() {
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-[#8a7560]">Canal</span>
+            <span className="text-xs font-semibold text-[#8a7560]">Contexto</span>
             <select
-              value={source}
-              onChange={(e) => setSource(e.target.value)}
+              value={contextFilter}
+              onChange={(e) => setContextFilter(e.target.value as ContextFilter)}
               className="h-11 px-3 rounded-lg border border-primary/20 bg-white text-sm focus:ring-2 focus:ring-primary/20 outline-none"
             >
-              <option value="">Todos</option>
-              {SOURCE_OPTIONS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
+              <option value="ALL">Todos</option>
+              <option value="EVENT">Eventos</option>
+              <option value="LOCAL">Locales</option>
             </select>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-[#8a7560]">ID Cliente (opcional)</span>
-            <input
-              type="number"
+            <span className="text-xs font-semibold text-[#8a7560]">Cliente (opcional)</span>
+            <select
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
               className="h-11 px-3 rounded-lg border border-primary/20 bg-white text-sm focus:ring-2 focus:ring-primary/20 outline-none"
-              placeholder="Ej: 3"
-            />
+              disabled={!customers.length}
+            >
+              <option value="">{customers.length ? 'Selecciona cliente' : 'Sin clientes'}</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-[#8a7560]">Evento (opcional)</span>
+            <select
+              value={eventId}
+              onChange={(e) => setEventId(e.target.value)}
+              className="h-11 px-3 rounded-lg border border-primary/20 bg-white text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+              disabled={contextFilter === 'LOCAL' || !events.length}
+            >
+              <option value="">
+                {contextFilter === 'LOCAL'
+                  ? 'No aplica en locales'
+                  : events.length
+                  ? 'Selecciona evento'
+                  : 'Sin eventos'}
+              </option>
+              {events.map((ev) => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="md:col-span-2 flex items-end gap-2">
             <button
@@ -323,7 +432,8 @@ export default function PosHistorialPage() {
                 setStartDate('');
                 setEndDate('');
                 setStatus('');
-                setSource('');
+                setContextFilter('ALL');
+                setEventId('');
                 setCustomerId('');
               }}
               disabled={loading}

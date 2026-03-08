@@ -21,6 +21,12 @@ type UiCustomer = {
   isExpanded?: boolean;
 };
 
+const sanitizePhone = (phone?: string) => {
+  if (!phone) return '';
+  if (phone.startsWith('NO_PHONE_')) return '';
+  return phone;
+};
+
 export default function CustomersPage() {
   const [expandedCustomer, setExpandedCustomer] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -84,7 +90,7 @@ export default function CustomersPage() {
         const id = Number.isFinite(numericId) ? numericId : idx + 1;
         const name = customer.name || 'Sin nombre';
         const email = customer.email || 'Sin correo';
-        const phone = customer.phone || 'Sin teléfono';
+        const phone = sanitizePhone(customer.phone) || 'Sin teléfono';
         const color = gradientPalette[(groupIdx + idx) % gradientPalette.length];
         const orders = Array.isArray(customer.orders) ? customer.orders : [];
         const latestOrder = orders
