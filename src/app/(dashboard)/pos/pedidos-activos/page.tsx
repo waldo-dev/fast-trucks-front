@@ -89,6 +89,8 @@ export default function PosPedidosActivosPage() {
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   useEffect(() => {
     const loadOrders = async () => {
@@ -136,6 +138,10 @@ export default function PosPedidosActivosPage() {
     loadOrders();
   }, [status, refreshKey]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [status, refreshKey]);
+
   // Contadores globales (fetch ALL) para que no se vacíen al cambiar a filtros sin resultados
   useEffect(() => {
     const loadAllCounts = async () => {
@@ -181,6 +187,17 @@ export default function PosPedidosActivosPage() {
     if (status === 'ALL') return orders;
     return orders.filter((o) => o.status === status);
   }, [orders, status]);
+
+  const totalPages = Math.max(1, Math.ceil(displayedOrders.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return displayedOrders.slice(start, start + pageSize);
+  }, [displayedOrders, currentPage]);
+
+  const handlePrev = () => setPage((prev) => Math.max(1, prev - 1));
+  const handleNext = () => setPage((prev) => Math.min(totalPages, prev + 1));
 
   const handleStatusChange = async (orderId: string, nextStatus: StatusValue) => {
     if (!nextStatus || nextStatus === 'ALL') return;
@@ -264,42 +281,111 @@ export default function PosPedidosActivosPage() {
         ) : displayedOrders.length === 0 ? (
           <div className="p-6 text-sm text-gray-600">No hay pedidos para este estado.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-primary/10">
-              <thead className="bg-primary/5">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Pedido</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Cliente</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Tipo</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Estado</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Canal</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Pago</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Total</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Creado</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-primary/10 bg-white">
-                {displayedOrders.map((o) => (
-                  <tr key={o.id} className="hover:bg-primary/5">
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-gray-900">{o.code}</span>
-                        <span className="text-xs text-gray-500">{o.itemsCount} ítems</span>
+          <div className="space-y-4">
+            {/* Desktop: tabla */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full divide-y divide-primary/10">
+                <thead className="bg-primary/5">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Pedido</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Cliente</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Tipo</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Estado</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Canal</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Pago</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Total</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Creado</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-primary/10 bg-white">
+                  {paginatedOrders.map((o) => (
+                    <tr key={o.id} className="hover:bg-primary/5">
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-gray-900">{o.code}</span>
+                          <span className="text-xs text-gray-500">{o.itemsCount} ítems</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-gray-900">{o.customerName}</span>
+                          <span className="text-xs text-gray-500">{o.customerPhone}</span>
+                          {o.type === 'DELIVERY' && o.address && (
+                            <span className="text-xs text-gray-500">{o.address}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            o.type === 'DELIVERY'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                        >
+                          {o.type === 'DELIVERY' ? 'Delivery' : 'Retiro'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const opt = STATUS_OPTIONS.find((s) => s.value === o.status) || STATUS_OPTIONS[1];
+                          return (
+                            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${opt.color}`}>
+                              {opt.label}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{o.source}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {o.paymentType ? o.paymentType.toUpperCase() : '—'}
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-gray-900">{formatClp(o.total)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{formatDate(o.createdAt)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <select
+                            className="border border-primary/20 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-primary/20"
+                            value={o.status}
+                            onChange={(e) => handleStatusChange(o.backendId, e.target.value as StatusValue)}
+                            disabled={updatingId === o.backendId}
+                          >
+                            {STATUS_OPTIONS.filter((s) => s.value !== 'ALL').map((s) => (
+                              <option key={s.value} value={s.value}>
+                                {s.label}
+                              </option>
+                            ))}
+                          </select>
+                          {updatingId === o.backendId && (
+                            <span className="text-xs text-gray-500">Actualizando...</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile: tarjetas */}
+            <div className="md:hidden divide-y divide-primary/10">
+              {paginatedOrders.map((o) => {
+                const statusOpt = STATUS_OPTIONS.find((s) => s.value === o.status) || STATUS_OPTIONS[1];
+                return (
+                  <div key={o.id} className="px-4 py-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-gray-900">{o.code}</p>
+                        <p className="text-xs text-gray-500">{formatDate(o.createdAt)}</p>
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-gray-900">{o.customerName}</span>
-                        <span className="text-xs text-gray-500">{o.customerPhone}</span>
-                        {o.type === 'DELIVERY' && o.address && (
-                          <span className="text-xs text-gray-500">{o.address}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
+                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${statusOpt.color}`}>
+                        {statusOpt.label}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
                       <span
-                        className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
                           o.type === 'DELIVERY'
                             ? 'bg-blue-100 text-blue-800'
                             : 'bg-emerald-100 text-emerald-800'
@@ -307,27 +393,25 @@ export default function PosPedidosActivosPage() {
                       >
                         {o.type === 'DELIVERY' ? 'Delivery' : 'Retiro'}
                       </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {(() => {
-                        const opt = STATUS_OPTIONS.find((s) => s.value === o.status) || STATUS_OPTIONS[1];
-                        return (
-                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${opt.color}`}>
-                            {opt.label}
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{o.source}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">
-                      {o.paymentType ? o.paymentType.toUpperCase() : '—'}
-                    </td>
-                    <td className="px-4 py-3 font-semibold text-gray-900">{formatClp(o.total)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{formatDate(o.createdAt)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                        {o.source}
+                      </span>
+                      <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">
+                        {o.paymentType ? o.paymentType.toUpperCase() : '—'}
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-800">
+                      <p className="font-semibold">{o.customerName}</p>
+                      <p className="text-xs text-gray-500">{o.customerPhone}</p>
+                      {o.type === 'DELIVERY' && o.address && (
+                        <p className="text-xs text-gray-500">{o.address}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-base font-bold text-gray-900">{formatClp(o.total)}</span>
+                      <div className="flex items-center gap-2">
                         <select
-                          className="border border-primary/20 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-primary/20"
+                          className="border border-primary/20 rounded-lg px-2 py-1 text-sm bg-white focus:ring-2 focus:ring-primary/20"
                           value={o.status}
                           onChange={(e) => handleStatusChange(o.backendId, e.target.value as StatusValue)}
                           disabled={updatingId === o.backendId}
@@ -339,14 +423,35 @@ export default function PosPedidosActivosPage() {
                           ))}
                         </select>
                         {updatingId === o.backendId && (
-                          <span className="text-xs text-gray-500">Actualizando...</span>
+                          <span className="text-xs text-gray-500">...</span>
                         )}
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Paginación */}
+            <div className="flex items-center justify-between px-4 pb-4">
+              <button
+                onClick={handlePrev}
+                disabled={currentPage === 1}
+                className="px-3 py-2 text-sm font-semibold rounded-lg border border-primary/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/5"
+              >
+                Anterior
+              </button>
+              <span className="text-sm text-gray-700">
+                Página {currentPage} de {totalPages}
+              </span>
+              <button
+                onClick={handleNext}
+                disabled={currentPage === totalPages}
+                className="px-3 py-2 text-sm font-semibold rounded-lg border border-primary/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/5"
+              >
+                Siguiente
+              </button>
+            </div>
           </div>
         )}
       </div>

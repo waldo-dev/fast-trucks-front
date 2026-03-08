@@ -25,7 +25,7 @@ export default function InventoryPage() {
     .map((s) => ({ ...s, status: 'Bajo stock' }));
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 px-4 pb-10 sm:px-0">
       <header className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a7560]">
           Gestión de inventario
@@ -53,7 +53,8 @@ export default function InventoryPage() {
           <h3 className="text-base font-bold dark:text-white">Stock (ejemplo)</h3>
           <span className="text-xs text-[#8a7560]">Datos ficticios</span>
         </div>
-        <div className="overflow-x-auto">
+        {/* Desktop tabla */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
               <tr className="text-left text-[#8a7560] uppercase text-xs tracking-wide">
@@ -76,6 +77,37 @@ export default function InventoryPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        {/* Mobile cards */}
+        <div className="sm:hidden space-y-3">
+          {stock.map((s) => (
+            <div
+              key={s.sku}
+              className="rounded-lg border border-[#f0ebe6] dark:border-[#3d3226] bg-[#fcfbf9] dark:bg-[#332a1f] p-3 shadow-sm"
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-[#181411] dark:text-white">{s.name}</p>
+                  <p className="text-xs text-[#8a7560]">SKU: {s.sku}</p>
+                  <p className="text-xs text-[#8a7560]">{s.negocio}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-base font-bold text-[#181411] dark:text-white">{s.qty}</p>
+                  <p className="text-xs text-[#8a7560]">Stock</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-xs mt-2">
+                <span className="text-[#8a7560]">Mínimo: {s.min}</span>
+                <span
+                  className={`px-2 py-1 rounded-full text-[11px] font-semibold ${
+                    s.qty <= s.min ? 'bg-red-100 text-red-700' : 'bg-emerald-50 text-emerald-700'
+                  }`}
+                >
+                  {s.qty <= s.min ? 'Bajo stock' : 'OK'}
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

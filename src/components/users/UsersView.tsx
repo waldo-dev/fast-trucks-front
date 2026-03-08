@@ -40,6 +40,8 @@ export const UsersView = ({ scope }: UsersViewProps) => {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<NormalizedUser | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
   const [form, setForm] = useState<{
     name: string;
     email: string;
@@ -331,6 +333,21 @@ export const UsersView = ({ scope }: UsersViewProps) => {
     );
   }, [search, users, selectedBusiness]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [search, selectedBusiness, users]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+
+  const paginatedUsers = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage]);
+
+  const handlePrev = () => setPage((prev) => Math.max(1, prev - 1));
+  const handleNext = () => setPage((prev) => Math.min(totalPages, prev + 1));
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
@@ -434,47 +451,128 @@ export const UsersView = ({ scope }: UsersViewProps) => {
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left text-[#8a7560] uppercase tracking-[0.08em] text-xs">
-                  <th className="px-3 py-2">Nombre</th>
-                  <th className="px-3 py-2">Email</th>
-                  <th className="px-3 py-2">Rol</th>
-                  <th className="px-3 py-2">Local/Negocio</th>
-                  <th className="px-3 py-2">Estado</th>
-                  <th className="px-3 py-2 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="border-t border-[#f0ece8] dark:border-[#3d3326] hover:bg-[#f9f7f5] dark:hover:bg-[#241c14]"
-                  >
-                    <td className="px-3 py-3 font-semibold text-[#181411] dark:text-white">
-                      {user.name}
-                    </td>
-                    <td className="px-3 py-3 text-[#4b5563] dark:text-[#a3907d]">
-                      {user.email}
-                    </td>
-                    <td className="px-3 py-3">
-                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-[#f5f2f0] text-[#8a7560] dark:bg-[#241c14] dark:text-[#d2b29b]">
-                        <span className="material-symbols-outlined text-[14px]">shield_person</span>
-                        {roleLabel(user.role)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-[#4b5563] dark:text-[#a3907d]">
-                      {user.businessName || '—'}
-                    </td>
-                    <td className="px-3 py-3">
-                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                        <span className="material-symbols-outlined text-[14px]">task_alt</span>
-                        {user.status || 'activo'}
-                      </span>
-                    </td>
-                  <td className="px-3 py-3 text-right">
-                    <div className="flex justify-end gap-3">
+          <div className="space-y-4">
+            {/* Desktop: tabla */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[#8a7560] uppercase tracking-[0.08em] text-xs">
+                    <th className="px-3 py-2">Nombre</th>
+                    <th className="px-3 py-2">Email</th>
+                    <th className="px-3 py-2">Rol</th>
+                    <th className="px-3 py-2">Local/Negocio</th>
+                    <th className="px-3 py-2">Estado</th>
+                    <th className="px-3 py-2 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedUsers.map((user) => (
+                    <tr
+                      key={user.id}
+                      className="border-t border-[#f0ece8] dark:border-[#3d3326] hover:bg-[#f9f7f5] dark:hover:bg-[#241c14]"
+                    >
+                      <td className="px-3 py-3 font-semibold text-[#181411] dark:text-white">
+                        {user.name}
+                      </td>
+                      <td className="px-3 py-3 text-[#4b5563] dark:text-[#a3907d]">
+                        {user.email}
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-[#f5f2f0] text-[#8a7560] dark:bg-[#241c14] dark:text-[#d2b29b]">
+                          <span className="material-symbols-outlined text-[14px]">shield_person</span>
+                          {roleLabel(user.role)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-[#4b5563] dark:text-[#a3907d]">
+                        {user.businessName || '—'}
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                          <span className="material-symbols-outlined text-[14px]">task_alt</span>
+                          {user.status || 'activo'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <div className="flex justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingUser(user);
+                              setActionError(null);
+                              setForm({
+                                name: user.name,
+                                email: user.email,
+                                password: '',
+                                role: user.role || 'LOCAL_OPERATOR',
+                                active: (user.status || 'activo').toLowerCase() !== 'inactive',
+                                businessIds:
+                                  user.businessIds && user.businessIds.length
+                                    ? user.businessIds
+                                    : user.businessId
+                                    ? [user.businessId]
+                                    : [],
+                              });
+                              setModalError(null);
+                              setModalOpen(true);
+                            }}
+                            className="text-primary font-semibold text-sm hover:underline"
+                          >
+                            Editar
+                          </button>
+                          {(cachedRole === 'ADMIN' || cachedRole === 'BUSINESS_OWNER') && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPasswordUser(user);
+                                setPasswordValue('');
+                                setPasswordError(null);
+                              }}
+                              className="text-[#8a7560] font-semibold text-sm hover:underline"
+                            >
+                              Contraseña
+                            </button>
+                          )}
+                          {cachedRole === 'ADMIN' && (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmUser(user)}
+                              disabled={deletingId === user.id}
+                              className="text-red-600 font-semibold text-sm hover:underline disabled:opacity-60"
+                            >
+                              {deletingId === user.id ? 'Eliminando...' : 'Eliminar'}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile: tarjetas */}
+            <div className="md:hidden divide-y divide-[#f0ece8] dark:divide-[#3d3326] border border-[#f0ece8] dark:border-[#3d3326] rounded-xl">
+              {paginatedUsers.map((user) => (
+                <div key={user.id} className="p-4 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-[#181411] dark:text-white">{user.name}</p>
+                      <p className="text-xs text-[#8a7560]">{user.email}</p>
+                    </div>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#f5f2f0] text-[#8a7560] dark:bg-[#241c14] dark:text-[#d2b29b]">
+                      <span className="material-symbols-outlined text-[14px]">shield_person</span>
+                      {roleLabel(user.role)}
+                    </span>
+                  </div>
+                  <div className="text-sm text-[#4b5563] dark:text-[#a3907d]">
+                    <p className="font-semibold">{user.businessName || '—'}</p>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                      <span className="material-symbols-outlined text-[14px]">task_alt</span>
+                      {user.status || 'activo'}
+                    </span>
+                    <div className="flex items-center gap-3">
                       <button
                         type="button"
                         onClick={() => {
@@ -496,7 +594,7 @@ export const UsersView = ({ scope }: UsersViewProps) => {
                           setModalError(null);
                           setModalOpen(true);
                         }}
-                        className="text-primary font-semibold text-sm hover:underline"
+                        className="text-primary font-semibold text-xs hover:underline"
                       >
                         Editar
                       </button>
@@ -508,7 +606,7 @@ export const UsersView = ({ scope }: UsersViewProps) => {
                             setPasswordValue('');
                             setPasswordError(null);
                           }}
-                          className="text-[#8a7560] font-semibold text-sm hover:underline"
+                          className="text-[#8a7560] font-semibold text-xs hover:underline"
                         >
                           Contraseña
                         </button>
@@ -518,17 +616,47 @@ export const UsersView = ({ scope }: UsersViewProps) => {
                           type="button"
                           onClick={() => setConfirmUser(user)}
                           disabled={deletingId === user.id}
-                          className="text-red-600 font-semibold text-sm hover:underline disabled:opacity-60"
+                          className="text-red-600 font-semibold text-xs hover:underline disabled:opacity-60"
                         >
-                          {deletingId === user.id ? 'Eliminando...' : 'Eliminar'}
+                          {deletingId === user.id ? '...' : 'Eliminar'}
                         </button>
                       )}
                     </div>
-                  </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Paginación */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <span className="text-sm text-[#8a7560] text-center sm:text-left">
+                Mostrando{' '}
+                <span className="text-[#181411]">
+                  {filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}
+                  {filtered.length > 0 ? `-${Math.min(currentPage * pageSize, filtered.length)}` : ''}
+                </span>{' '}
+                de <span className="text-[#181411]">{filtered.length}</span> usuarios
+              </span>
+              <div className="flex items-center gap-2 justify-center sm:justify-end">
+                <button
+                  onClick={handlePrev}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 border border-primary/20 rounded-lg text-sm font-bold bg-white text-[#181411] hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                >
+                  Anterior
+                </button>
+                <span className="text-sm text-[#8a7560] font-medium">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <button
+                  onClick={handleNext}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 border border-primary/20 rounded-lg text-sm font-bold bg-white text-[#181411] hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

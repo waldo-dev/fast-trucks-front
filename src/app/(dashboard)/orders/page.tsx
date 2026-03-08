@@ -114,6 +114,8 @@ export default function OrdersPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [exporting, setExporting] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -195,6 +197,21 @@ export default function OrdersPage() {
       return matchesStatus && matchesSearch;
     });
   }, [normalizedOrders, activeFilter, search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeFilter, search, normalizedOrders]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredOrders.slice(start, start + pageSize);
+  }, [filteredOrders, currentPage]);
+
+  const handlePrev = () => setPage((prev) => Math.max(1, prev - 1));
+  const handleNext = () => setPage((prev) => Math.min(totalPages, prev + 1));
 
   const statusCounts = useMemo(() => {
     return normalizedOrders.reduce(
@@ -405,28 +422,107 @@ export default function OrdersPage() {
           No hay pedidos para mostrar.
         </div>
       ) : (
-        <OrderTable
-          orders={filteredOrders}
-          onViewDetails={handleViewDetails}
-          onUpdateStatus={handleUpdateStatus}
-          updatingId={updatingId}
-        />
+        <div className="w-full bg-white border border-[#e6e0db] border-t-0 rounded-b-2xl">
+          {/* Escritorio: tabla */}
+          <div className="hidden md:block">
+            <OrderTable
+              orders={paginatedOrders}
+              onViewDetails={handleViewDetails}
+              onUpdateStatus={handleUpdateStatus}
+              updatingId={updatingId}
+            />
+          </div>
+
+          {/* Mobile: tarjetas */}
+          <div className="md:hidden divide-y divide-[#f0eae4]">
+            {paginatedOrders.map((order) => (
+              <div key={order.id} className="px-4 py-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-[#181411]">#{order.id}</p>
+                    <p className="text-xs text-[#8a7560]">{order.time}</p>
+                  </div>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${
+                      order.status === 'ready'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : order.status === 'preparing'
+                          ? 'bg-primary/10 text-primary'
+                          : order.status === 'delivered'
+                            ? 'bg-slate-200 text-slate-700'
+                            : order.status === 'cancelled'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-yellow-100 text-yellow-800'
+                    }`}
+                  >
+                    {order.status === 'ready'
+                      ? 'Listo'
+                      : order.status === 'preparing'
+                        ? 'Preparando'
+                        : order.status === 'delivered'
+                          ? 'Entregado'
+                          : order.status === 'cancelled'
+                            ? 'Cancelado'
+                            : 'Nuevo'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span
+                    className={`px-2 py-1 rounded-full font-semibold ${
+                      order.type === 'Delivery'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-emerald-100 text-emerald-800'
+                    }`}
+                  >
+                    {order.type}
+                  </span>
+                  <span className="px-2 py-1 rounded-full bg-primary/10 text-primary font-semibold">
+                    {order.venue}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                    {order.customer.initials}
+                  </div>
+                  <div className="text-sm text-[#181411]">
+                    <p className="font-semibold">{order.customer.name}</p>
+                    <p className="text-xs text-[#8a7560]">{order.total}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Pagination */}
       <div className="flex items-center justify-between py-6 px-4">
         <p className="text-sm text-[#8a7560] font-medium">
-          Mostrando <span className="text-[#181411]">{filteredOrders.length}</span> de{' '}
-          <span className="text-[#181411]">{normalizedOrders.length}</span> pedidos
+          Mostrando{' '}
+          <span className="text-[#181411]">
+            {filteredOrders.length === 0
+              ? 0
+              : (currentPage - 1) * pageSize + 1}
+            {filteredOrders.length > 0 ? `-${Math.min(currentPage * pageSize, filteredOrders.length)}` : ''}
+          </span>{' '}
+          de <span className="text-[#181411]">{filteredOrders.length}</span> pedidos
         </p>
         <div className="flex gap-2">
           <button
             className="px-4 py-2 border border-[#e6e0db] rounded-lg text-sm font-bold bg-white text-[#181411] hover:bg-[#f5f2f0] disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled
+            onClick={handlePrev}
+            disabled={currentPage === 1}
           >
             Anterior
           </button>
-          <button className="px-4 py-2 border border-[#e6e0db] rounded-lg text-sm font-bold bg-white text-[#181411] hover:bg-[#f5f2f0]">
+          <span className="text-sm text-[#8a7560] font-medium">
+            Página {currentPage} de {totalPages}
+          </span>
+          <button
+            className="px-4 py-2 border border-[#e6e0db] rounded-lg text-sm font-bold bg-white text-[#181411] hover:bg-[#f5f2f0] disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleNext}
+            disabled={currentPage === totalPages}
+          >
             Siguiente
           </button>
         </div>

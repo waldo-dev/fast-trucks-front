@@ -84,6 +84,8 @@ export default function PosHistorialPage() {
   const [customerId, setCustomerId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   const loadBusinesses = useCallback(async () => {
     try {
@@ -186,6 +188,10 @@ export default function PosHistorialPage() {
     fetchOrders({ start, end });
   }, [selectedBusiness, startDate, endDate, fetchOrders]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [selectedBusiness, startDate, endDate, status, source, customerId]);
+
   const statusLabel = (value: string) => {
     switch (value) {
       case 'CREATED':
@@ -206,6 +212,16 @@ export default function PosHistorialPage() {
   };
 
   const filteredOrders = useMemo(() => orders, [orders]);
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredOrders.slice(start, start + pageSize);
+  }, [filteredOrders, currentPage]);
+
+  const handlePrev = () => setPage((prev) => Math.max(1, prev - 1));
+  const handleNext = () => setPage((prev) => Math.min(totalPages, prev + 1));
 
   return (
     <div className="flex flex-col gap-4">
@@ -336,56 +352,137 @@ export default function PosHistorialPage() {
             : 'Selecciona un local para ver el historial.'}
         </div>
       ) : (
-        <div className="bg-white border border-primary/10 rounded-xl shadow-sm overflow-x-auto">
-          <table className="min-w-full text-left">
-            <thead className="bg-primary/5 text-[#8a7560] text-xs font-bold uppercase tracking-wider">
-              <tr>
-                <th className="px-4 py-3">Pedido</th>
-                <th className="px-4 py-3">Local</th>
-                <th className="px-4 py-3">Contexto</th>
-                <th className="px-4 py-3">Evento</th>
-                <th className="px-4 py-3">Cliente</th>
-                <th className="px-4 py-3">Canal</th>
-                <th className="px-4 py-3">Tipo</th>
-                <th className="px-4 py-3">Estado</th>
-                <th className="px-4 py-3">Total</th>
-                <th className="px-4 py-3">Fecha</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-primary/10 text-sm text-[#181411]">
-              {filteredOrders.map((o) => (
-                <tr key={o.id} className="hover:bg-primary/5">
-                  <td className="px-4 py-3 font-semibold">#{o.code}</td>
-                  <td className="px-4 py-3">{o.businessName}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
-                          o.contextType === 'event'
-                            ? 'bg-primary/10 text-primary border border-primary/20'
-                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        }`}
-                      >
-                        <span className="material-symbols-outlined text-sm">
-                          {o.contextType === 'event' ? 'event' : 'store'}
+        <div className="bg-white border border-primary/10 rounded-xl shadow-sm">
+          <div className="space-y-4">
+            {/* Escritorio: tabla */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full text-left">
+                <thead className="bg-primary/5 text-[#8a7560] text-xs font-bold uppercase tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3">Pedido</th>
+                    <th className="px-4 py-3">Local</th>
+                    <th className="px-4 py-3">Contexto</th>
+                    <th className="px-4 py-3">Evento</th>
+                    <th className="px-4 py-3">Cliente</th>
+                    <th className="px-4 py-3">Canal</th>
+                    <th className="px-4 py-3">Tipo</th>
+                    <th className="px-4 py-3">Estado</th>
+                    <th className="px-4 py-3">Total</th>
+                    <th className="px-4 py-3">Fecha</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-primary/10 text-sm text-[#181411]">
+                  {paginatedOrders.map((o) => (
+                    <tr key={o.id} className="hover:bg-primary/5">
+                      <td className="px-4 py-3 font-semibold">#{o.code}</td>
+                      <td className="px-4 py-3">{o.businessName}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
+                            o.contextType === 'event'
+                              ? 'bg-primary/10 text-primary border border-primary/20'
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-sm">
+                            {o.contextType === 'event' ? 'event' : 'store'}
+                          </span>
+                          {o.contextLabel}
                         </span>
-                        {o.contextLabel}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-[#181411]">{o.eventLabel}</td>
-                  <td className="px-4 py-3">{o.customerName}</td>
-                    <td className="px-4 py-3">{o.sourceLabel}</td>
-                    <td className="px-4 py-3">{o.type === 'DELIVERY' ? 'Delivery' : 'Retiro'}</td>
-                  <td className="px-4 py-3">
+                      </td>
+                      <td className="px-4 py-3 text-[#181411]">{o.eventLabel}</td>
+                      <td className="px-4 py-3">{o.customerName}</td>
+                      <td className="px-4 py-3">{o.sourceLabel}</td>
+                      <td className="px-4 py-3">{o.type === 'DELIVERY' ? 'Delivery' : 'Retiro'}</td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase">
+                          {statusLabel(o.status)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-bold">{formatClp(o.total)}</td>
+                      <td className="px-4 py-3 text-[#8a7560]">{formatDate(o.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile: tarjetas */}
+            <div className="md:hidden divide-y divide-primary/10">
+              {paginatedOrders.map((o) => (
+                <div key={o.id} className="px-4 py-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-[#181411]">#{o.code}</p>
+                      <p className="text-xs text-[#8a7560]">{formatDate(o.createdAt)}</p>
+                    </div>
                     <span className="px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase">
                       {statusLabel(o.status)}
                     </span>
-                  </td>
-                  <td className="px-4 py-3 font-bold">{formatClp(o.total)}</td>
-                  <td className="px-4 py-3 text-[#8a7560]">{formatDate(o.createdAt)}</td>
-                </tr>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full font-semibold ${
+                        o.contextType === 'event'
+                          ? 'bg-primary/10 text-primary border border-primary/20'
+                          : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-sm">
+                        {o.contextType === 'event' ? 'event' : 'store'}
+                      </span>
+                      {o.contextLabel}
+                    </span>
+                    {o.eventLabel && (
+                      <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-700 font-semibold">
+                        {o.eventLabel}
+                      </span>
+                    )}
+                    <span className="px-2 py-1 rounded-full bg-primary/10 text-primary font-semibold">
+                      {o.sourceLabel}
+                    </span>
+                    <span
+                      className={`px-2 py-1 rounded-full font-semibold ${
+                        o.type === 'DELIVERY'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}
+                    >
+                      {o.type === 'DELIVERY' ? 'Delivery' : 'Retiro'}
+                    </span>
+                  </div>
+                  <div className="text-sm text-[#181411]">
+                    <p className="font-semibold">{o.customerName}</p>
+                    <p className="text-xs text-[#8a7560]">{o.businessName}</p>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-base font-bold text-[#181411]">{formatClp(o.total)}</span>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+
+            {/* Paginación */}
+            <div className="flex items-center justify-between px-4 pb-4">
+              <button
+                onClick={handlePrev}
+                disabled={currentPage === 1}
+                className="px-3 py-2 text-sm font-semibold rounded-lg border border-primary/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/5"
+              >
+                Anterior
+              </button>
+              <span className="text-sm text-[#8a7560]">
+                Página {currentPage} de {totalPages}
+              </span>
+              <button
+                onClick={handleNext}
+                disabled={currentPage === totalPages}
+                className="px-3 py-2 text-sm font-semibold rounded-lg border border-primary/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/5"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

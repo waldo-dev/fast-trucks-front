@@ -257,14 +257,14 @@ export default function OutletsPage() {
           </h1>
           <p className="text-[#8a7560] text-lg font-medium">{subtitle}</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-col sm:flex-row w-full sm:w-auto">
           <button className="flex items-center gap-2 rounded-xl h-12 px-6 bg-white border border-[#e6e0db] text-[#181411] font-bold hover:bg-gray-50 transition-all shadow-sm">
             <span className="material-symbols-outlined">filter_list</span>
             <span>Filtros</span>
           </button>
           <button
             onClick={handleAddOutlet}
-            className="flex items-center gap-2 rounded-xl h-12 px-6 bg-primary text-white font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
+            className="flex items-center gap-2 rounded-xl h-12 px-6 bg-primary text-white font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 w-full sm:w-auto justify-center"
           >
             <span className="material-symbols-outlined">add_circle</span>
             <span>Agregar Nuevo Local</span>
@@ -287,7 +287,7 @@ export default function OutletsPage() {
             <span>No hay locales disponibles. Crea el primero para comenzar.</span>
             <button
               onClick={handleAddOutlet}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white font-bold hover:bg-primary/90"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white font-bold hover:bg-primary/90 w-full sm:w-auto justify-center"
             >
               <span className="material-symbols-outlined text-sm">add</span>
               Nuevo local

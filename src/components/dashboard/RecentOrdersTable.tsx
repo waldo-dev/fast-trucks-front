@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 
 type OrderStatus =
@@ -43,6 +43,19 @@ const statusMeta = (status: OrderStatus) => {
 };
 
 export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ orders }) => {
+  const pageSize = 5;
+  const [page, setPage] = useState(1);
+
+  const totalPages = Math.max(1, Math.ceil(orders.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return orders.slice(start, start + pageSize);
+  }, [orders, currentPage, pageSize]);
+
+  const handlePrev = () => setPage((prev) => Math.max(1, prev - 1));
+  const handleNext = () => setPage((prev) => Math.min(totalPages, prev + 1));
 
   return (
     <div className="xl:col-span-2 bg-white dark:bg-[#2d2419] rounded-xl shadow-sm border border-[#e6e0db] overflow-hidden">
@@ -52,7 +65,8 @@ export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ orders }) 
           Ver Todos
         </Link>
       </div>
-      <div className="overflow-x-auto">
+      {/* Escritorio: tabla */}
+      <div className="overflow-x-auto hidden md:block">
         <table className="w-full text-left">
           <thead className="bg-[#fcfbf9] dark:bg-[#3d3226]">
             <tr>
@@ -74,32 +88,83 @@ export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ orders }) 
             </tr>
           </thead>
           <tbody className="divide-y divide-[#f5f2f0]">
-            {orders.map((order) => (
-              <tr
-                key={order.id}
-                className="hover:bg-background-light dark:hover:bg-[#3d3226] transition-colors"
-              >
-                <td className="px-6 py-4 text-sm font-semibold text-primary">{order.id}</td>
-                <td className="px-6 py-4 text-sm text-[#4b5563] dark:text-[#a3907d]">
-                  {order.venue}
-                </td>
-                <td className="px-6 py-4 text-sm font-medium dark:text-white">
-                  {order.customer}
-                </td>
-                <td className="px-6 py-4 text-sm dark:text-[#a3907d]">{order.amount}</td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-bold rounded-full ${
-                      statusMeta(order.status).className
-                    }`}
-                  >
-                    {statusMeta(order.status).label}
-                  </span>
-                </td>
-              </tr>
-            ))}
+            {paginatedOrders.map((order) => {
+              const meta = statusMeta(order.status);
+              return (
+                <tr
+                  key={order.id}
+                  className="hover:bg-background-light dark:hover:bg-[#3d3226] transition-colors"
+                >
+                  <td className="px-6 py-4 text-sm font-semibold text-primary">{order.id}</td>
+                  <td className="px-6 py-4 text-sm text-[#4b5563] dark:text-[#a3907d]">
+                    {order.venue}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-medium dark:text-white">
+                    {order.customer}
+                  </td>
+                  <td className="px-6 py-4 text-sm dark:text-[#a3907d]">{order.amount}</td>
+                  <td className="px-6 py-4">
+                    <span className={`px-3 py-1 text-xs font-bold rounded-full ${meta.className}`}>
+                      {meta.label}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile: tarjetas */}
+      <div className="md:hidden divide-y divide-[#f5f2f0]">
+        {paginatedOrders.map((order) => {
+          const meta = statusMeta(order.status);
+          return (
+            <div key={order.id} className="px-6 py-4">
+              <div className="flex justify-between items-center mb-2">
+                <div className="text-sm font-semibold text-primary">{order.id}</div>
+                <span className={`px-3 py-1 text-xs font-bold rounded-full ${meta.className}`}>
+                  {meta.label}
+                </span>
+              </div>
+              <div className="space-y-1 text-sm">
+                <div className="text-[#4b5563] dark:text-[#a3907d]">
+                  <span className="font-semibold">Local: </span>
+                  {order.venue}
+                </div>
+                <div className="dark:text-white">
+                  <span className="font-semibold">Cliente: </span>
+                  {order.customer}
+                </div>
+                <div className="dark:text-[#a3907d]">
+                  <span className="font-semibold">Monto: </span>
+                  {order.amount}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Controles de paginación */}
+      <div className="flex items-center justify-between px-6 py-4 border-t border-[#f5f2f0]">
+        <button
+          onClick={handlePrev}
+          disabled={currentPage === 1}
+          className="px-3 py-2 text-sm font-semibold rounded-lg border border-[#e6e0db] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#fcfbf9] dark:hover:bg-[#3d3226]"
+        >
+          Anterior
+        </button>
+        <span className="text-sm text-[#4b5563] dark:text-[#a3907d]">
+          Página {currentPage} de {totalPages}
+        </span>
+        <button
+          onClick={handleNext}
+          disabled={currentPage === totalPages}
+          className="px-3 py-2 text-sm font-semibold rounded-lg border border-[#e6e0db] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#fcfbf9] dark:hover:bg-[#3d3226]"
+        >
+          Siguiente
+        </button>
       </div>
     </div>
   );

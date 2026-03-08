@@ -78,6 +78,8 @@ export default function EventsPage() {
   >([{ name: '', role: '', email: '', phone: '', notes: '' }]);
   const [products, setProducts] = useState<Array<{ id: number; name: string }>>([]);
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   const fetchEvents = useCallback(async () => {
     setLoading(true);
@@ -134,6 +136,10 @@ export default function EventsPage() {
   }, [fetchEvents]);
 
   useEffect(() => {
+    setPage(1);
+  }, [futureOnly, activeFilter, events]);
+
+  useEffect(() => {
     const loadProducts = async () => {
       const businessId = getCachedUser()?.businessId;
       if (!businessId) return;
@@ -156,6 +162,16 @@ export default function EventsPage() {
   }, []);
 
   const filteredEvents = useMemo(() => events, [events]);
+  const totalPages = Math.max(1, Math.ceil(filteredEvents.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+
+  const paginatedEvents = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredEvents.slice(start, start + pageSize);
+  }, [filteredEvents, currentPage]);
+
+  const handlePrev = () => setPage((prev) => Math.max(1, prev - 1));
+  const handleNext = () => setPage((prev) => Math.min(totalPages, prev + 1));
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -324,77 +340,166 @@ export default function EventsPage() {
         ) : filteredEvents.length === 0 ? (
           <div className="text-sm text-[#8a7560]">No hay eventos para los filtros seleccionados.</div>
         ) : (
-          <div className="overflow-x-auto bg-white dark:bg-[#2d2419] border border-[#e6e0db] dark:border-[#3d3226] rounded-xl">
-            <table className="min-w-full text-left">
-              <thead className="bg-primary/5 text-[#8a7560] text-xs font-bold uppercase tracking-wider">
-                <tr>
-                  <th className="px-4 py-3">Nombre</th>
-                  <th className="px-4 py-3">Fecha</th>
-                  <th className="px-4 py-3">Inicio</th>
-                  <th className="px-4 py-3">Fin</th>
-                  <th className="px-4 py-3">Organizadores</th>
-                  <th className="px-4 py-3">Ciudad / Distrito</th>
-                  <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3">Activo</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-primary/10 text-sm text-[#181411]">
-                {filteredEvents.map((ev) => (
-                  <tr key={ev.id} className="hover:bg-primary/5">
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col">
-                        <span className="font-bold">{ev.name}</span>
-                        {ev.organizer && (
-                          <span className="text-xs text-[#8a7560]">Organiza: {ev.organizer}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">{formatDate(ev.date)}</td>
-                    <td className="px-4 py-3">{formatDateTime(ev.start)}</td>
-                    <td className="px-4 py-3">{formatDateTime(ev.end)}</td>
-                    <td className="px-4 py-3">
-                      {ev.organizers?.length ? (
-                        <div className="flex flex-col text-xs text-[#181411] gap-1">
-                          {ev.organizers.slice(0, 2).map((org, idx) => (
-                            <span key={idx} className="inline-flex items-center gap-1">
-                              <span className="font-semibold">{org.name || 'Organizador'}</span>
-                              {org.role && <span className="text-[#8a7560]">({org.role})</span>}
-                            </span>
-                          ))}
-                          {ev.organizers.length > 2 && (
-                            <span className="text-[#8a7560]">+{ev.organizers.length - 2} más</span>
+          <div className="space-y-4">
+            {/* Escritorio: tabla */}
+            <div className="hidden md:block overflow-x-auto bg-white dark:bg-[#2d2419] border border-[#e6e0db] dark:border-[#3d3226] rounded-xl">
+              <table className="min-w-full text-left">
+                <thead className="bg-primary/5 text-[#8a7560] text-xs font-bold uppercase tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3">Nombre</th>
+                    <th className="px-4 py-3">Fecha</th>
+                    <th className="px-4 py-3">Inicio</th>
+                    <th className="px-4 py-3">Fin</th>
+                    <th className="px-4 py-3">Organizadores</th>
+                    <th className="px-4 py-3">Ciudad / Distrito</th>
+                    <th className="px-4 py-3">Estado</th>
+                    <th className="px-4 py-3">Activo</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-primary/10 text-sm text-[#181411]">
+                  {paginatedEvents.map((ev) => (
+                    <tr key={ev.id} className="hover:bg-primary/5">
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col">
+                          <span className="font-bold">{ev.name}</span>
+                          {ev.organizer && (
+                            <span className="text-xs text-[#8a7560]">Organiza: {ev.organizer}</span>
                           )}
                         </div>
-                      ) : (
-                        <span className="text-[#8a7560]">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col">
-                        <span>
-                          {ev.city || ev.district
-                            ? `${ev.city || ''} ${ev.district || ''}`.trim()
-                            : '—'}
-                        </span>
-                        {ev.address && (
-                          <span className="text-xs text-[#8a7560]">{ev.address}</span>
+                      </td>
+                      <td className="px-4 py-3">{formatDate(ev.date)}</td>
+                      <td className="px-4 py-3">{formatDateTime(ev.start)}</td>
+                      <td className="px-4 py-3">{formatDateTime(ev.end)}</td>
+                      <td className="px-4 py-3">
+                        {ev.organizers?.length ? (
+                          <div className="flex flex-col text-xs text-[#181411] gap-1">
+                            {ev.organizers.slice(0, 2).map((org, idx) => (
+                              <span key={idx} className="inline-flex items-center gap-1">
+                                <span className="font-semibold">{org.name || 'Organizador'}</span>
+                                {org.role && <span className="text-[#8a7560]">({org.role})</span>}
+                              </span>
+                            ))}
+                            {ev.organizers.length > 2 && (
+                              <span className="text-[#8a7560]">+{ev.organizers.length - 2} más</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[#8a7560]">—</span>
                         )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">{ev.status || '—'}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
-                          ev.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'
-                        }`}
-                      >
-                        {ev.isActive ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col">
+                          <span>
+                            {ev.city || ev.district
+                              ? `${ev.city || ''} ${ev.district || ''}`.trim()
+                              : '—'}
+                          </span>
+                          {ev.address && (
+                            <span className="text-xs text-[#8a7560]">{ev.address}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">{ev.status || '—'}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                            ev.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'
+                          }`}
+                        >
+                          {ev.isActive ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile: tarjetas */}
+            <div className="md:hidden divide-y divide-primary/10 bg-white dark:bg-[#2d2419] border border-[#e6e0db] dark:border-[#3d3226] rounded-xl">
+              {paginatedEvents.map((ev) => (
+                <div key={ev.id} className="px-4 py-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-[#181411]">{ev.name}</p>
+                      {ev.organizer && (
+                        <p className="text-xs text-[#8a7560]">Organiza: {ev.organizer}</p>
+                      )}
+                    </div>
+                    <span
+                      className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                        ev.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'
+                      }`}
+                    >
+                      {ev.isActive ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </div>
+                  <div className="text-sm text-[#181411] space-y-1">
+                    <p>
+                      <span className="font-semibold">Fecha:</span> {formatDate(ev.date)}
+                    </p>
+                    <p className="text-xs text-[#8a7560]">
+                      {formatDateTime(ev.start)} · {formatDateTime(ev.end)}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Lugar:</span>{' '}
+                      {ev.city || ev.district
+                        ? `${ev.city || ''} ${ev.district || ''}`.trim()
+                        : '—'}
+                    </p>
+                    {ev.address && <p className="text-xs text-[#8a7560]">{ev.address}</p>}
+                  </div>
+                  <div className="text-xs text-[#8a7560]">
+                    {ev.organizers?.length ? (
+                      <p>
+                        Organizadores: {ev.organizers.map((o) => o.name || 'Organizador').join(', ')}
+                      </p>
+                    ) : (
+                      <p>Organizadores: —</p>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-[#181411]">
+                    <span className="px-2 py-1 rounded-full bg-primary/10 text-primary font-semibold">
+                      {ev.status || '—'}
+                    </span>
+                    <span className="text-[#8a7560]">{ev.eventType || ''}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Paginación */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-2">
+              <span className="text-sm text-[#8a7560] text-center sm:text-left">
+                Mostrando{' '}
+                <span className="text-[#181411]">
+                  {filteredEvents.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}
+                  {filteredEvents.length > 0
+                    ? `-${Math.min(currentPage * pageSize, filteredEvents.length)}`
+                    : ''}
+                </span>{' '}
+                de <span className="text-[#181411]">{filteredEvents.length}</span> eventos
+              </span>
+              <div className="flex items-center gap-2 justify-center sm:justify-end">
+                <button
+                  onClick={handlePrev}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 border border-primary/20 rounded-lg text-sm font-bold bg-white text-[#181411] hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                >
+                  Anterior
+                </button>
+                <span className="text-sm text-[#8a7560] font-medium">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <button
+                  onClick={handleNext}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 border border-primary/20 rounded-lg text-sm font-bold bg-white text-[#181411] hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

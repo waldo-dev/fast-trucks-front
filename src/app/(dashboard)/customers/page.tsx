@@ -39,6 +39,8 @@ export default function CustomersPage() {
     address: '',
     status: 'Active',
   });
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   const initialsFromName = (name?: string) => {
     if (!name) return 'NN';
@@ -184,6 +186,10 @@ export default function CustomersPage() {
     fetchBusinessNames();
   }, [fetchCustomers, fetchBusinessNames]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [customers]);
+
   const stats = useMemo(
     () => [
       {
@@ -320,6 +326,17 @@ export default function CustomersPage() {
     isExpanded: expandedCustomer === customer.id,
   }));
 
+  const totalPages = Math.max(1, Math.ceil(customersWithExpanded.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+
+  const paginatedCustomers = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return customersWithExpanded.slice(start, start + pageSize);
+  }, [customersWithExpanded, currentPage]);
+
+  const handlePrev = () => setPage((prev) => Math.max(1, prev - 1));
+  const handleNext = () => setPage((prev) => Math.min(totalPages, prev + 1));
+
   return (
     <div className="flex-1 flex flex-col p-6 lg:p-10 gap-8 overflow-y-auto">
       {/* Breadcrumbs */}
@@ -378,12 +395,97 @@ export default function CustomersPage() {
           No hay clientes para mostrar.
         </div>
       ) : (
-        <CustomerTable
-          customers={customersWithExpanded}
-          onToggleExpand={handleToggleExpand}
-          onViewProfile={handleViewProfile}
-        />
+        <div className="bg-white border border-primary/10 rounded-lg">
+          {/* Escritorio: tabla */}
+          <div className="hidden md:block">
+            <CustomerTable
+              customers={paginatedCustomers}
+              onToggleExpand={handleToggleExpand}
+              onViewProfile={handleViewProfile}
+            />
+          </div>
+
+          {/* Mobile: tarjetas */}
+          <div className="md:hidden divide-y divide-primary/10">
+            {paginatedCustomers.map((c) => (
+              <div key={c.id} className="px-4 py-3 space-y-2">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`size-11 rounded-full bg-gradient-to-br ${c.avatarColor} flex items-center justify-center text-sm font-bold`}
+                  >
+                    {c.initials}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-[#181411]">{c.name}</p>
+                    <p className="text-xs text-[#8a7560]">{c.email}</p>
+                    <p className="text-xs text-[#8a7560]">{c.phone}</p>
+                  </div>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${
+                      c.status === 'VIP'
+                        ? 'bg-purple-100 text-purple-700'
+                        : c.status === 'Active'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                    }`}
+                  >
+                    {c.status}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <div className="text-[#181411]">
+                    <p className="font-semibold">{c.totalOrders} pedidos</p>
+                    <p className="text-xs text-[#8a7560]">
+                      Último: {c.lastOrder.time} · {c.lastOrder.venue}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleViewProfile(c.id)}
+                    className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-lg border border-primary/20 text-primary hover:bg-primary/5"
+                  >
+                    Ver perfil
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
+
+      {/* Paginación */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-4 px-2">
+        <p className="text-sm text-[#8a7560] font-medium text-center sm:text-left">
+          Mostrando{' '}
+          <span className="text-[#181411]">
+            {customersWithExpanded.length === 0
+              ? 0
+              : (currentPage - 1) * pageSize + 1}
+            {customersWithExpanded.length > 0
+              ? `-${Math.min(currentPage * pageSize, customersWithExpanded.length)}`
+              : ''}
+          </span>{' '}
+          de <span className="text-[#181411]">{customersWithExpanded.length}</span> clientes
+        </p>
+        <div className="flex items-center gap-2 justify-center sm:justify-end">
+          <button
+            onClick={handlePrev}
+            disabled={currentPage === 1}
+            className="px-4 py-2 border border-primary/20 rounded-lg text-sm font-bold bg-white text-[#181411] hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+          >
+            Anterior
+          </button>
+          <span className="text-sm text-[#8a7560] font-medium">
+            Página {currentPage} de {totalPages}
+          </span>
+          <button
+            onClick={handleNext}
+            disabled={currentPage === totalPages}
+            className="px-4 py-2 border border-primary/20 rounded-lg text-sm font-bold bg-white text-[#181411] hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+          >
+            Siguiente
+          </button>
+        </div>
+      </div>
 
       {/* Modal Crear Cliente */}
       {isModalOpen && (
