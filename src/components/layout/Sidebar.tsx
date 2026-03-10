@@ -68,17 +68,6 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
               name: b.name || b.brand_name || `Negocio ${b.id}`,
             }))
           );
-          // Autoseleccionar solo si hay un único negocio
-          if (!operatingContext && list.length === 1 && list[0]?.id) {
-            const only = list[0];
-            const ctx: OperatingContext = {
-              type: 'business',
-              business_id: String(only.id),
-              business_name: only.name || only.brand_name,
-            };
-            setOperatingContext(ctx);
-            writeOperatingContext(ctx);
-          }
         }
       } catch {
         // silencio
@@ -94,8 +83,13 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
     const ctx: OperatingContext = {
       type: 'business',
       business_id: id,
-      business_name: selected?.name,
     };
+    if ((operatingContext as any)?.planTier) {
+      (ctx as any).planTier = (operatingContext as any).planTier;
+    }
+    if (selected?.name) {
+      (ctx as any).business_name = selected.name;
+    }
     // Buscar suscripción activa para tier
     try {
       const resp = await subscriptionService.list({ business_id: id, status: 'ACTIVE' } as any);
@@ -135,6 +129,7 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
       '/orders': 'reports',
       '/pos/historial': 'reports',
       '/outlets': 'multi_registers',
+      '/events/analytics': 'reports',
       // '/mailing': 'crm', // no se limita de momento
     };
 
@@ -149,6 +144,10 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
       if (!item) return undefined;
       const feature = featureByHref[href];
       const tierFromCtx = (operatingContext as any)?.planTier;
+      // Si aún no conocemos el plan (p.ej. al primer login sin contexto), no filtramos.
+      if (!tierFromCtx && feature) {
+        return item;
+      }
       const effectiveTier = tierFromCtx || 'BASIC';
       if (feature && !hasFeature(feature, effectiveTier as any)) return undefined;
       return item;
@@ -167,6 +166,7 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
       '/promotions',
       '/payments',
       '/events',
+      '/events/analytics',
       '/outlets',
       '/mailing',
       '/inventory',

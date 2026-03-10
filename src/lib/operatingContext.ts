@@ -3,7 +3,7 @@ import { normalizeTier, PlanTier } from './planAccess';
 
 export type OperatingContext =
   | { type: 'event'; event_id?: string; event_name?: string; business_id?: string }
-  | { type: 'business'; business_id?: string; business_name?: string; planTier?: PlanTier }
+  | { type: 'business'; business_id?: string; planTier?: PlanTier; business_name?: string }
   | null;
 
 const STORAGE_KEY = 'business_operating_context';
@@ -46,4 +46,6 @@ export const withPlanTier = (ctx: OperatingContext, tier?: PlanTier): OperatingC
   }
   return ctx;
 };
+
+
 

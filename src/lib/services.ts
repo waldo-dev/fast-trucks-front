@@ -260,6 +260,18 @@ export const eventService = {
     api.get(`events${qs(params)}`, { auth: true }),
   get: (id: string | number) => api.get(`events/${id}`, { auth: true }),
   create: (data: unknown) => api.post("events", data, { auth: true }),
+  analytics: (params?: { limit?: number }) =>
+    api.get(`events/analytics${qs(params as any)}`, { auth: true }),
+  summary: (id: string | number) => api.get(`events/${id}/summary`, { auth: true }),
+  listExpenses: (id: string | number) =>
+    api.get(`events/${id}/expenses`, { auth: true }),
+  createExpense: (
+    id: string | number,
+    data: { type?: string; description?: string; amount: number }
+  ) => api.post(`events/${id}/expenses`, data, { auth: true }),
+  deleteExpense: (id: string | number, expenseId: string | number) =>
+    api.delete(`events/${id}/expenses/${expenseId}`, { auth: true }),
+  // Exports removidos; los endpoints definidos son sólo JSON
 };
 
 export const orderService = {

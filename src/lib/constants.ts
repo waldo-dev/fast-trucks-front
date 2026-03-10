@@ -42,6 +42,11 @@ export const SIDEBAR_ITEMS = [
     icon: 'event',
   },
   {
+    title: 'Analítica de Eventos',
+    href: '/events/analytics',
+    icon: 'query_stats',
+  },
+  {
     title: 'Mailing',
     href: '/mailing',
     icon: 'mail',
