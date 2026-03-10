@@ -84,6 +84,41 @@ export const subscriptionService = {
     api.put(`subscriptions/${id}`, data, { auth: true }),
 };
 
+export const inventoryService = {
+  listItems: (params?: { search?: string; active?: boolean }) =>
+    api.get(`inventory/items${qs(params as any)}`, { auth: true }),
+  createItem: (data: {
+    name: string;
+    unit: string;
+    cost_per_item?: number;
+    min_stock?: number;
+    active?: boolean;
+  }) => api.post('inventory/items', data, { auth: true }),
+  updateItem: (
+    id: string | number,
+    data: {
+      name?: string;
+      unit?: string;
+      cost_per_item?: number;
+      min_stock?: number;
+      active?: boolean;
+    }
+  ) => api.patch(`inventory/items/${id}`, data, { auth: true }),
+  listMovements: (itemId: string | number) =>
+    api.get(`inventory/items/${itemId}/movements`, { auth: true }),
+  createMovement: (data: {
+    inventory_item_id: string | number;
+    quantity: number;
+    movement_type: 'IN' | 'OUT' | 'ADJUST';
+    reason?: string;
+  }) => api.post('inventory/movements', data, { auth: true }),
+  importRecipes: (file: File | Blob) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.postForm('inventory/recipes/import', form, { auth: true });
+  },
+};
+
 export const userService = {
   list: () => api.get("users", { auth: true }),
   listByBusiness: (businessId: string | number) =>
