@@ -142,7 +142,8 @@ export const userService = {
 
 export const categoryService = {
   list: () => api.get("categories", { auth: true }),
-  listByOwner: () => api.get("categories/owner", { auth: true }),
+  listByOwner: (params?: { business_id?: string | number }) =>
+    api.get(`categories/owner${qs(params)}`, { auth: true }),
   get: (id: string | number) => api.get(`categories/${id}`, { auth: true }),
   create: (data: unknown) => api.post("categories", data, { auth: true }),
   createBulk: (data: unknown) =>
@@ -180,6 +181,7 @@ export const productService = {
     const form = new FormData();
     form.append("name", payload.name);
     if (payload.description) form.append("description", payload.description);
+    if (payload.sku) form.append("sku", payload.sku);
     form.append("price", String(payload.price));
     form.append("category_id", String(payload.category_id));
     if (payload.status) form.append("status", payload.status);
@@ -203,6 +205,7 @@ export const productService = {
     const form = new FormData();
     form.append("name", payload.name);
     if (payload.description) form.append("description", payload.description);
+    if (payload.sku) form.append("sku", payload.sku);
     form.append("price", String(payload.price));
     form.append("category_id", String(payload.category_id));
     if (payload.status) form.append("status", payload.status);

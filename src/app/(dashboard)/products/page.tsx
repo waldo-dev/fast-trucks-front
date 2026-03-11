@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { businessService, categoryService, productService } from '@/lib/services';
+import { readOperatingContext } from '@/lib/operatingContext';
 import { toast } from 'react-toastify';
 import { ProductFilters } from '@/components/products/ProductFilters';
 import { ProductTable } from '@/components/products/ProductTable';
@@ -77,7 +78,11 @@ export default function ProductsPage() {
 
   const loadCategories = async () => {
     try {
-      const resp = await categoryService.listByOwner();
+      const ctx = readOperatingContext();
+      const ctxBusinessId = ctx?.type === 'business' ? ctx.business_id : undefined;
+      const resp = await categoryService.listByOwner({
+        business_id: ctxBusinessId || undefined,
+      });
       const list = (resp as any)?.data ?? resp;
       const mapped =
         Array.isArray(list) && list.length
@@ -252,8 +257,10 @@ export default function ProductsPage() {
   const loadProducts = async () => {
     setLoading(true);
     try {
+      const ctx = readOperatingContext();
+      const ctxBusinessId = ctx?.type === 'business' ? ctx.business_id : undefined;
       const resp = await productService.listByOwner({
-        business_id: selectedVenue || undefined,
+        business_id: selectedVenue || ctxBusinessId || undefined,
         category_id: selectedCategory || undefined,
         status: selectedStatus || undefined,
       });
@@ -311,6 +318,10 @@ export default function ProductsPage() {
   };
 
   useEffect(() => {
+    const ctx = readOperatingContext();
+    if (!selectedVenue && ctx?.type === 'business' && ctx.business_id) {
+      setSelectedVenue(String(ctx.business_id));
+    }
     loadProducts();
   }, [selectedVenue, selectedCategory, selectedStatus]);
 
@@ -392,8 +403,8 @@ export default function ProductsPage() {
         productService.updateStatus(productId, { status: targetStatus }, { business_id: businessParam }),
         {
           pending:
-            targetStatus === 'INACTIVE' ? 'Inactivando producto...' : 'Activando producto...',
-          success: targetStatus === 'INACTIVE' ? 'Producto inactivado' : 'Producto activado',
+            targetStatus === 'INACTIVE' ? 'Eliminando producto...' : 'Activando producto...',
+          success: targetStatus === 'INACTIVE' ? 'Producto eliminado' : 'Producto activado',
           error: 'No se pudo actualizar el estado',
         }
       );
@@ -756,7 +767,7 @@ export default function ProductsPage() {
 
       {showCategoryModal && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center px-4"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center px-4 py-6 overflow-y-auto"
           onClick={() => {
             setShowCategoryModal(false);
             setNewCategory('');
@@ -764,7 +775,7 @@ export default function ProductsPage() {
           }}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-md p-6 relative"
+            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-md p-6 relative max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -784,48 +795,36 @@ export default function ProductsPage() {
               onSubmit={async (e) => {
                 e.preventDefault();
                 if (!newCategory.trim()) return;
-                const businessIds = categoryVenues
-                  .map((id) => Number(id))
-                  .filter((id) => !Number.isNaN(id));
-                if (businessIds.length === 0) {
-                  setCategoryError('Selecciona al menos un local para asociar la categoría.');
+                const ctx = readOperatingContext();
+                const businessId =
+                  ctx?.type === 'business' && ctx.business_id ? Number(ctx.business_id) : undefined;
+                if (!businessId || Number.isNaN(businessId)) {
+                  setCategoryError('No hay un local seleccionado en el contexto.');
                   return;
                 }
                 setSavingCategory(true);
                 setCategoryError(null);
                 try {
-                  if (businessIds.length > 1) {
-                    await categoryService.createBulk({
-                      name: newCategory.trim(),
-                      business_ids: businessIds,
-                    });
-                  } else {
-                    const resp = await categoryService.create({
-                      name: newCategory.trim(),
-                      business_id: businessIds[0],
-                    });
-                    const created = (resp as any)?.data ?? resp;
-                    const newItem = {
-                      id: String(created?.id || Math.random()),
-                      name: created?.name || newCategory.trim(),
-                      icon: 'category',
-                    };
-                    setCategories((prev) => {
-                      const filtered = prev.filter((c) => c.id !== newItem.id);
-                      return [
-                        { id: '', name: 'Todas', icon: 'category' },
-                        ...filtered.filter((c) => c.id !== ''),
-                        newItem,
-                      ];
-                    });
-                  }
+                  const resp = await categoryService.create({
+                    name: newCategory.trim(),
+                    business_id: businessId,
+                  });
+                  const created = (resp as any)?.data ?? resp;
+                  const newItem = {
+                    id: String(created?.id || Math.random()),
+                    name: created?.name || newCategory.trim(),
+                    icon: 'category',
+                  };
+                  setCategories((prev) => {
+                    const filtered = prev.filter((c) => c.id !== newItem.id);
+                    return [
+                      { id: '', name: 'Todas', icon: 'category' },
+                      ...filtered.filter((c) => c.id !== ''),
+                      newItem,
+                    ];
+                  });
                   setShowCategoryModal(false);
                   setNewCategory('');
-                  setCategoryVenues(
-                    venues.filter((v) => v.id !== '').length === 1
-                      ? [venues.find((v) => v.id !== '')?.id || '']
-                      : []
-                  );
                   // Reload categories to reflect server state
                   await loadCategories();
                 } catch (err) {
@@ -844,34 +843,7 @@ export default function ProductsPage() {
                 placeholder="Ej. Bebidas"
                 required
               />
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-gray-600">Asociar a locales</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {venues
-                    .filter((v) => v.id !== '')
-                    .map((v) => {
-                      const checked = categoryVenues.includes(v.id);
-                      return (
-                        <label
-                          key={v.id}
-                          className="flex items-center gap-2 px-3 py-2 border rounded-lg cursor-pointer hover:border-primary/40"
-                        >
-                          <input
-                            type="checkbox"
-                            className="text-primary border-gray-300 rounded focus:ring-primary"
-                            checked={checked}
-                            onChange={() =>
-                              setCategoryVenues((prev) =>
-                                checked ? prev.filter((id) => id !== v.id) : [...prev, v.id]
-                              )
-                            }
-                          />
-                          <span className="text-sm text-gray-700">{v.name}</span>
-                        </label>
-                      );
-                    })}
-                </div>
-              </div>
+              {/* Selección de locales removida: se usa el business del contexto */}
               {categoryError && (
                 <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
                   {categoryError}
@@ -904,7 +876,7 @@ export default function ProductsPage() {
 
       {showProductModal && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center px-4"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center px-4 py-6 overflow-y-auto"
           onClick={() => {
             setShowProductModal(false);
             setProductError(null);
@@ -918,16 +890,11 @@ export default function ProductsPage() {
               options: '',
               image: null,
             });
-            setProductVenues(
-              venues.filter((v) => v.id !== '').length === 1
-                ? [venues.find((v) => v.id !== '')?.id || '']
-                : []
-            );
             setEditingProductId(null);
           }}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-2xl p-6 relative"
+            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-2xl p-6 relative max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -972,11 +939,11 @@ export default function ProductsPage() {
                   setProductError('Nombre, precio y categoría son obligatorios');
                   return;
                 }
-                const businessIds = productVenues
-                  .map((id) => Number(id))
-                  .filter((id) => !Number.isNaN(id));
-                if (businessIds.length === 0 && venues.filter((v) => v.id !== '').length > 0) {
-                  setProductError('Selecciona al menos un local para asociar el producto.');
+                const ctx = readOperatingContext();
+                const ctxBusinessId =
+                  ctx?.type === 'business' && ctx.business_id ? Number(ctx.business_id) : undefined;
+                if (!ctxBusinessId || Number.isNaN(ctxBusinessId)) {
+                  setProductError('No hay un local seleccionado en el contexto.');
                   return;
                 }
                 setProductSaving(true);
@@ -991,19 +958,7 @@ export default function ProductsPage() {
                       category_id: productForm.category_id,
                       status: productForm.status,
                       options: productForm.options || undefined,
-                      business_ids: businessIds,
-                    });
-                  } else if (businessIds.length > 1) {
-                    promise = productService.createBulkWithImage({
-                      name: productForm.name,
-                      description: productForm.description || undefined,
-                      sku: productForm.sku || undefined,
-                      price: productForm.price,
-                      category_id: productForm.category_id,
-                      status: productForm.status,
-                      options: productForm.options || undefined,
-                      business_ids: businessIds,
-                      image: productForm.image || undefined,
+                      business_ids: [ctxBusinessId],
                     });
                   } else {
                     promise = productService.createWithImage({
@@ -1014,7 +969,7 @@ export default function ProductsPage() {
                       category_id: productForm.category_id,
                       status: productForm.status,
                       options: productForm.options || undefined,
-                      business_id: businessIds[0],
+                      business_id: ctxBusinessId,
                       image: productForm.image || undefined,
                     });
                   }
@@ -1036,11 +991,6 @@ export default function ProductsPage() {
                     options: '',
                     image: null,
                   });
-                  setProductVenues(
-                    venues.filter((v) => v.id !== '').length === 1
-                      ? [venues.find((v) => v.id !== '')?.id || '']
-                      : []
-                  );
                   setEditingProductId(null);
                   setProductLoading(false);
                   await loadProducts();
@@ -1127,51 +1077,7 @@ export default function ProductsPage() {
                   <option value="draft">Borrador</option>
                 </select>
               </div>
-              <div className="flex flex-col gap-2 md:col-span-2">
-                <label className="text-sm font-semibold text-[#181411]">Asociar a locales</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {venues
-                    .filter((v) => v.id !== '')
-                    .map((v) => {
-                      const checked = productVenues.includes(v.id);
-                      return (
-                        <label
-                          key={v.id}
-                          className="flex items-center gap-2 px-3 py-2 border rounded-lg cursor-pointer hover:border-primary/40"
-                        >
-                          <input
-                            type="checkbox"
-                            className="text-primary border-gray-300 rounded focus:ring-primary"
-                            checked={checked}
-                            onChange={() =>
-                              setProductVenues((prev) =>
-                                checked ? prev.filter((id) => id !== v.id) : [...prev, v.id]
-                              )
-                            }
-                          />
-                          <span className="text-sm text-gray-700">{v.name}</span>
-                        </label>
-                      );
-                    })}
-                  {venues.filter((v) => v.id !== '').length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setProductVenues(
-                          productVenues.length === venues.filter((v) => v.id !== '').length
-                            ? []
-                            : venues.filter((v) => v.id !== '').map((v) => v.id)
-                        )
-                      }
-                      className="col-span-1 sm:col-span-2 text-xs font-semibold text-primary hover:underline text-left"
-                    >
-                      {productVenues.length === venues.filter((v) => v.id !== '').length
-                        ? 'Quitar selección'
-                        : 'Seleccionar todos'}
-                    </button>
-                  )}
-                </div>
-              </div>
+              {/* Asociar a locales: se usa el business del contexto, no selección manual */}
               {/*<div className="flex flex-col gap-2 md:col-span-2">
                 <label className="text-sm font-semibold text-[#181411]">Opciones (JSON opcional)</label>
                 <textarea
@@ -1233,11 +1139,11 @@ export default function ProductsPage() {
 
       {filtersOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center px-4"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center px-4 py-6 overflow-y-auto"
           onClick={() => setFiltersOpen(false)}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-md max-h-[80vh] overflow-hidden relative"
+            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-md max-h-[85vh] overflow-hidden relative"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -1264,11 +1170,11 @@ export default function ProductsPage() {
 
       {confirmProduct && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center px-4"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center px-4 py-6 overflow-y-auto"
           onClick={() => setConfirmProduct(null)}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-md p-6 relative"
+            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-md p-6 relative max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -1318,11 +1224,11 @@ export default function ProductsPage() {
 
       {editCategory && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center px-4"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center px-4 py-6 overflow-y-auto"
           onClick={() => setEditCategory(null)}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-md p-6 relative"
+            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-md p-6 relative max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -1405,11 +1311,11 @@ export default function ProductsPage() {
 
       {confirmCategory && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center px-4"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center px-4 py-6 overflow-y-auto"
           onClick={() => setConfirmCategory(null)}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-md p-6 relative"
+            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-md p-6 relative max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -1474,7 +1380,7 @@ export default function ProductsPage() {
 
       {showImportModal && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center px-4"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center px-4 py-6 overflow-y-auto"
           onClick={() => {
             setShowImportModal(false);
             setImportError(null);
@@ -1482,7 +1388,7 @@ export default function ProductsPage() {
           }}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-md p-6 relative"
+            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-md p-6 relative max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -1548,11 +1454,11 @@ export default function ProductsPage() {
       )}
       {showCategoriesList && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center px-4"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center px-4 py-6 overflow-y-auto"
           onClick={() => setShowCategoriesList(false)}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-lg p-6 relative max-h-[80vh] overflow-hidden"
+            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-lg p-6 relative max-h-[85vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -1633,11 +1539,11 @@ export default function ProductsPage() {
 
       {showExportConfirm && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center px-4"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center px-4 py-6 overflow-y-auto"
           onClick={() => setShowExportConfirm(false)}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-md p-6 relative"
+            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-md p-6 relative max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <button
