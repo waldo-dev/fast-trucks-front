@@ -297,18 +297,9 @@ export default function EventsPage() {
       return d.toISOString();
     };
 
-    const eventDateFormatted =
-      newEvent.event_date && /^\d{4}-\d{2}-\d{2}$/.test(newEvent.event_date)
-        ? newEvent.event_date
-        : undefined;
-    if (newEvent.event_date && !eventDateFormatted) {
-      toast.error('event_date debe ser YYYY-MM-DD');
-      return;
-    }
-
     const startIso = buildIsoUtc(newEvent.start_at);
     const endIso = buildIsoUtc(newEvent.end_at);
-    const closedIso = buildIsoUtc(newEvent.closed_at);
+    const closedIso = endIso;
     if (newEvent.start_at && !startIso) {
       toast.error('start_at debe ser datetime válido');
       return;
@@ -322,7 +313,9 @@ export default function EventsPage() {
     try {
       await eventService.create({
         name: newEvent.name.trim(),
-        event_date: eventDateFormatted,
+        event_date: newEvent.start_at
+          ? newEvent.start_at.split('T')[0]
+          : undefined,
         start_at: startIso,
         end_at: endIso,
         closed_at: closedIso,
@@ -633,14 +626,19 @@ export default function EventsPage() {
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
-                  Fecha (YYYY-MM-DD)
-                  <input
-                    type="date"
-                    value={newEvent.event_date}
-                    onChange={(e) => setNewEvent((p) => ({ ...p, event_date: e.target.value }))}
-                    className="h-10 px-3 rounded-lg border border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm"
-                    placeholder="2026-02-02"
-                  />
+                  Estado
+                  <select
+                    value={newEvent.status}
+                    onChange={(e) => setNewEvent((p) => ({ ...p, status: e.target.value }))}
+                    className="h-10 px-3 rounded-lg border border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm bg-white"
+                  >
+                    <option value="">Selecciona estado</option>
+                    {statusOptions.map((s) => (
+                      <option key={s} value={s}>
+                        {formatStatusLabel(s)}
+                      </option>
+                    ))}
+                  </select>
                 </label>
               </div>
 
@@ -711,24 +709,6 @@ export default function EventsPage() {
                 </label>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
-                  Estado
-                  <select
-                    value={newEvent.status}
-                    onChange={(e) => setNewEvent((p) => ({ ...p, status: e.target.value }))}
-                    className="h-10 px-3 rounded-lg border border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm bg-white"
-                  >
-                    <option value="">Selecciona estado</option>
-                    {statusOptions.map((s) => (
-                      <option key={s} value={s}>
-                        {formatStatusLabel(s)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
               <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
                 Notas
                 <textarea
@@ -765,108 +745,6 @@ export default function EventsPage() {
                     ))}
                   </select>
                 </label>
-                <div className="flex flex-col gap-3 text-sm font-semibold text-[#181411] bg-white border border-primary/10 rounded-xl p-3 shadow-sm">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <span className="text-[#181411]">Productos</span>
-                    <div className="flex flex-wrap gap-3 text-xs font-medium text-[#6f5b4a]">
-                      <label className="inline-flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          className="accent-primary"
-                          checked={allProductsSelected}
-                          onChange={toggleSelectAllProducts}
-                        />
-                        Seleccionar todos
-                      </label>
-                      <label className="inline-flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          className="accent-primary"
-                          checked={allPageProductsSelected}
-                          onChange={toggleSelectAllPageProducts}
-                        />
-                        Seleccionar página
-                      </label>
-                    </div>
-                  </div>
-                  <div className="max-h-48 overflow-y-auto border border-primary/10 rounded-lg p-3 bg-primary/5 space-y-2">
-                    {paginatedProducts.length === 0 ? (
-                      <span className="text-xs text-[#8a7560]">No hay productos disponibles.</span>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {paginatedProducts.map((p) => {
-                          const checked = selectedProductIds.includes(p.id);
-                          const displayName = toDisplayText(p.name) || `Producto ${p.id}`;
-                          return (
-                            <label
-                              key={p.id}
-                              className="flex items-center gap-3 text-sm font-medium text-[#181411] bg-white rounded-lg px-3 py-2 border border-primary/10 hover:border-primary/40 transition-colors"
-                            >
-                              <input
-                                type="checkbox"
-                                className="accent-primary"
-                                checked={checked}
-                                onChange={() =>
-                                  setSelectedProductIds((prev) =>
-                                    checked ? prev.filter((id) => id !== p.id) : [...prev, p.id]
-                                  )
-                                }
-                              />
-                              <span className="truncate">{displayName}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs text-[#8a7560] pt-1 gap-2">
-                    <span>
-                      Mostrando{' '}
-                      <span className="text-[#181411]">
-                        {products.length === 0
-                          ? 0
-                          : (currentProductPage - 1) * productPageSize + 1}
-                        {products.length > 0
-                          ? `-${Math.min(currentProductPage * productPageSize, products.length)}`
-                          : ''}
-                      </span>{' '}
-                      de <span className="text-[#181411]">{products.length}</span> productos
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleProductPrev}
-                        disabled={currentProductPage === 1}
-                        className="px-3 py-1.5 border border-primary/20 rounded-lg font-semibold bg-white text-[#181411] hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Anterior
-                      </button>
-                      <span className="font-medium text-[#181411]">
-                        Página {currentProductPage} de {totalProductPages}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleProductNext}
-                        disabled={currentProductPage === totalProductPages}
-                        className="px-3 py-1.5 border border-primary/20 rounded-lg font-semibold bg-white text-[#181411] hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Siguiente
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
-                  Cierre
-                  <input
-                    type="datetime-local"
-                    value={newEvent.closed_at}
-                    onChange={(e) => setNewEvent((p) => ({ ...p, closed_at: e.target.value }))}
-                    className="h-10 px-3 rounded-lg border border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm"
-                  />
-                </label>
                 <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
                   Tipo de evento
                   <select
@@ -882,6 +760,97 @@ export default function EventsPage() {
                     ))}
                   </select>
                 </label>
+              </div>
+
+              <div className="flex flex-col gap-3 text-sm font-semibold text-[#181411] bg-white border border-primary/10 rounded-xl p-3 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <span className="text-[#181411]">Productos</span>
+                  <div className="flex flex-wrap gap-3 text-xs font-medium text-[#6f5b4a]">
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="accent-primary"
+                        checked={allProductsSelected}
+                        onChange={toggleSelectAllProducts}
+                      />
+                      Seleccionar todos
+                    </label>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="accent-primary"
+                        checked={allPageProductsSelected}
+                        onChange={toggleSelectAllPageProducts}
+                      />
+                      Seleccionar página
+                    </label>
+                  </div>
+                </div>
+                <div className="max-h-48 overflow-y-auto border border-primary/10 rounded-lg p-3 bg-primary/5 space-y-2">
+                  {paginatedProducts.length === 0 ? (
+                    <span className="text-xs text-[#8a7560]">No hay productos disponibles.</span>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {paginatedProducts.map((p) => {
+                        const checked = selectedProductIds.includes(p.id);
+                        const displayName = toDisplayText(p.name) || `Producto ${p.id}`;
+                        return (
+                          <label
+                            key={p.id}
+                            className="flex items-center gap-3 text-sm font-medium text-[#181411] bg-white rounded-lg px-3 py-2 border border-primary/10 hover:border-primary/40 transition-colors"
+                          >
+                            <input
+                              type="checkbox"
+                              className="accent-primary"
+                              checked={checked}
+                              onChange={() =>
+                                setSelectedProductIds((prev) =>
+                                  checked ? prev.filter((id) => id !== p.id) : [...prev, p.id]
+                                )
+                              }
+                            />
+                            <span className="truncate">{displayName}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs text-[#8a7560] pt-1 gap-2">
+                  <span>
+                    Mostrando{' '}
+                    <span className="text-[#181411]">
+                      {products.length === 0
+                        ? 0
+                        : (currentProductPage - 1) * productPageSize + 1}
+                      {products.length > 0
+                        ? `-${Math.min(currentProductPage * productPageSize, products.length)}`
+                        : ''}
+                    </span>{' '}
+                    de <span className="text-[#181411]">{products.length}</span> productos
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleProductPrev}
+                      disabled={currentProductPage === 1}
+                      className="px-3 py-1.5 border border-primary/20 rounded-lg font-semibold bg-white text-[#181411] hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Anterior
+                    </button>
+                    <span className="font-medium text-[#181411]">
+                      Página {currentProductPage} de {totalProductPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleProductNext}
+                      disabled={currentProductPage === totalProductPages}
+                      className="px-3 py-1.5 border border-primary/20 rounded-lg font-semibold bg-white text-[#181411] hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Siguiente
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-3">
