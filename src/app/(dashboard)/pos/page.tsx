@@ -496,8 +496,8 @@ const friendlyOrderError = (err: any) => {
       </header>
 
       {/* Contenido principal responsive */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 lg:gap-6">
-        <div className="xl:col-span-2 flex flex-col gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-[1.3fr,1fr] gap-4 lg:gap-6">
+        <div className="flex flex-col gap-4">
           {/* Categorías */}
           <div className="flex gap-2 overflow-x-auto pb-1">
             {categories.map((cat) => (

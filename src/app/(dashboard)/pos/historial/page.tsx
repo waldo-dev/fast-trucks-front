@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { businessService, orderService, eventService, customerService } from '@/lib/services';
+import { readOperatingContext } from '@/lib/operatingContext';
 import { getCachedUser } from '@/lib/auth';
 import { toast } from 'react-toastify';
 
@@ -76,7 +77,9 @@ const todayRangeLocal = () => {
 
 export default function PosHistorialPage() {
   const [businesses, setBusinesses] = useState<Array<{ id: string; name: string }>>([]);
-  const [selectedBusiness, setSelectedBusiness] = useState<string>('');
+  const [selectedBusiness, setSelectedBusiness] = useState<string>(
+    () => readOperatingContext()?.business_id ?? ''
+  );
   const [events, setEvents] = useState<Array<{ id: string; name: string }>>([]);
   const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
   const [orders, setOrders] = useState<UiOrder[]>([]);
@@ -90,6 +93,7 @@ export default function PosHistorialPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const pageSize = 10;
+  const [operatingContext] = useState(() => readOperatingContext());
 
   const loadBusinesses = useCallback(async () => {
     try {
@@ -102,9 +106,16 @@ export default function PosHistorialPage() {
         }));
         setBusinesses(mapped);
         if (!selectedBusiness && mapped.length) {
-          const cached = getCachedUser()?.businessId;
-          const found = cached ? mapped.find((b) => b.id === String(cached)) : undefined;
-          setSelectedBusiness(found?.id || mapped[0].id);
+          const contextBiz = operatingContext?.business_id
+            ? mapped.find((b) => b.id === String(operatingContext.business_id))
+            : undefined;
+          if (contextBiz) {
+            setSelectedBusiness(contextBiz.id);
+          } else {
+            const cached = getCachedUser()?.businessId;
+            const found = cached ? mapped.find((b) => b.id === String(cached)) : undefined;
+            setSelectedBusiness(found?.id || mapped[0].id);
+          }
         }
       } else {
         setBusinesses([]);
@@ -114,7 +125,7 @@ export default function PosHistorialPage() {
       setBusinesses([]);
       toast.error(msg);
     }
-  }, [selectedBusiness]);
+  }, [selectedBusiness, operatingContext]);
 
   const loadEvents = useCallback(async () => {
     try {

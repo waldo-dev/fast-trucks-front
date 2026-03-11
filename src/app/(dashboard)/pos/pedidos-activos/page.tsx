@@ -27,13 +27,13 @@ type UiOrder = {
 };
 
 const STATUS_OPTIONS: Array<{ value: StatusValue; label: string; color: string }> = [
-  { value: 'ALL', label: 'Todos', color: 'bg-slate-200 text-slate-800' },
-  { value: 'CREATED', label: 'Creado', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'CONFIRMED', label: 'Confirmado', color: 'bg-blue-100 text-blue-800' },
-  { value: 'PREPARING', label: 'Preparando', color: 'bg-primary/10 text-primary' },
-  { value: 'READY', label: 'Listo', color: 'bg-emerald-100 text-emerald-800' },
-  { value: 'DELIVERED', label: 'Entregado', color: 'bg-gray-200 text-gray-800' },
-  { value: 'CANCELLED', label: 'Cancelado', color: 'bg-red-100 text-red-700' },
+  { value: 'ALL', label: 'Todas', color: 'bg-slate-200 text-slate-800' },
+  { value: 'CREATED', label: 'Creadas', color: 'bg-yellow-100 text-yellow-800' },
+  { value: 'CONFIRMED', label: 'Confirmadas', color: 'bg-blue-100 text-blue-800' },
+  { value: 'PREPARING', label: 'Preparandose', color: 'bg-primary/10 text-primary' },
+  { value: 'READY', label: 'Listas', color: 'bg-emerald-100 text-emerald-800' },
+  { value: 'DELIVERED', label: 'Entregadas', color: 'bg-gray-200 text-gray-800' },
+  { value: 'CANCELLED', label: 'Canceladas', color: 'bg-red-100 text-red-700' },
 ];
 
 const STATUS_TRANSITIONS: Record<StatusValue, StatusValue[]> = {
@@ -289,6 +289,8 @@ export default function PosPedidosActivosPage() {
         success: 'Estado actualizado',
         error: 'No se pudo actualizar el estado',
       });
+      setStatus(nextStatus);
+      setPage(1);
       setRefreshKey((n) => n + 1);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'No se pudo actualizar el estado';
@@ -365,7 +367,12 @@ export default function PosPedidosActivosPage() {
         <div className="flex items-center justify-between px-4 py-3 border-b border-primary/10">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary">bolt</span>
-            <h3 className="font-bold text-gray-900">Órdenes {status === 'ALL' ? 'activas' : status.toLowerCase()}</h3>
+            <h3 className="font-bold text-gray-900">
+              Órdenes{' '}
+              {(
+                STATUS_OPTIONS.find((s) => s.value === status)?.label ?? 'Activas'
+              ).toLowerCase()}
+            </h3>
           </div>
           {loading && <span className="text-xs text-gray-500">Actualizando...</span>}
         </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { businessService, promotionService, productService } from '@/lib/services';
+import { readOperatingContext, type OperatingContext } from '@/lib/operatingContext';
 
 type Promotion = {
   id: string;
@@ -63,6 +64,7 @@ export default function PromotionsPage() {
   >([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [operatingContext] = useState<OperatingContext>(() => readOperatingContext());
   const [editingPromotionId, setEditingPromotionId] = useState<string | null>(null);
   const [editingProductIds, setEditingProductIds] = useState<string[]>([]);
   const [form, setForm] = useState({
@@ -86,16 +88,25 @@ export default function PromotionsPage() {
             name: b.name || b.brand_name || 'Sin nombre',
           }));
           setBusinesses(mapped);
+
+          const contextBizId = operatingContext?.business_id
+            ? String(operatingContext.business_id)
+            : null;
           const allIds = mapped.map((b) => b.id);
-          setSelectedBusinesses(allIds);
-          setSelectedBusinessesForForm(allIds);
+          if (contextBizId && allIds.includes(contextBizId)) {
+            setSelectedBusinesses([contextBizId]);
+            setSelectedBusinessesForForm([contextBizId]);
+          } else {
+            setSelectedBusinesses(allIds);
+            setSelectedBusinessesForForm(allIds);
+          }
         }
       } catch {
         setBusinesses([]);
       }
     };
     loadBusinesses();
-  }, []);
+  }, [operatingContext]);
 
   useEffect(() => {
     const loadPromotions = async () => {
@@ -141,7 +152,11 @@ export default function PromotionsPage() {
 
   useEffect(() => {
     const loadProducts = async () => {
-      if (!showModal || !selectedBusinessesForForm.length) {
+      const businessIdsForProducts = operatingContext?.business_id
+        ? [String(operatingContext.business_id)]
+        : selectedBusinessesForForm;
+
+      if (!showModal || !businessIdsForProducts.length) {
         setProducts([]);
         setSelectedProducts([]);
         return;
@@ -149,7 +164,7 @@ export default function PromotionsPage() {
       setLoadingProducts(true);
       try {
         const responses = await Promise.all(
-          selectedBusinessesForForm.map((b) => productService.listByOwner({ business_id: b }))
+          businessIdsForProducts.map((b) => productService.listByOwner({ business_id: b }))
         );
         const businessNameMap = businesses.reduce<Record<string, string>>((acc, b) => {
           acc[b.id] = b.name;
@@ -167,8 +182,8 @@ export default function PromotionsPage() {
               const key = name.toLowerCase().trim() || String(p.id ?? Math.random());
               const id = String(p.id ?? Math.random());
               const bName =
-                businessNameMap[selectedBusinessesForForm[idx]] ??
-                selectedBusinessesForForm[idx] ??
+                businessNameMap[businessIdsForProducts[idx]] ??
+                businessIdsForProducts[idx] ??
                 'Local';
               if (!agg[key]) {
                 agg[key] = {
@@ -194,7 +209,7 @@ export default function PromotionsPage() {
       }
     };
     loadProducts();
-  }, [showModal, selectedBusinessesForForm, businesses]);
+  }, [showModal, selectedBusinessesForForm, businesses, operatingContext]);
 
   const filteredPromos = useMemo(() => {
     if (!search.trim()) return promotions;
@@ -468,7 +483,7 @@ export default function PromotionsPage() {
           }}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-2xl p-6 relative"
+            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 relative"
             onClick={(e) => e.stopPropagation()}
           >
             <button
