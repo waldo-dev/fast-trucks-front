@@ -294,7 +294,7 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
           )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-4 flex flex-col gap-2 pb-16">
+        <nav className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
           {sidebarItems.map((item) => {
             const isActive =
               pathname === item.href ||
@@ -320,35 +320,6 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
           })}
         </nav>
 
-        <div className="p-4 border-t border-[#f5f2f0] sticky bottom-0 bg-white dark:bg-[#2d2419]">
-          <div className="flex items-center justify-between gap-3 p-2">
-            <div className="flex items-center gap-3">
-              <div className="size-10 rounded-full border border-[#e6e0db] bg-orange-100 flex items-center justify-center">
-                <span className="text-primary font-semibold">
-                  {user?.name?.charAt(0).toUpperCase() || 'A'}
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold dark:text-white">
-                  {user?.name || 'Admin'}
-                </span>
-                <span className="text-xs text-[#8a7560]">
-                  {roleLabel(role)}
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                logout();
-                router.replace('/login');
-              }}
-              className="p-2 rounded-lg hover:bg-primary/10 text-[#8a7560] transition-colors"
-              aria-label="Cerrar sesión"
-            >
-              <span className="material-symbols-outlined text-base">logout</span>
-            </button>
-          </div>
-        </div>
       </aside>
     </>
   );
