@@ -255,7 +255,6 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
         className={`fixed lg:static inset-y-0 left-0 z-40 transform transition-transform duration-200 lg:translate-x-0 ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         } w-72 lg:w-64 flex-shrink-0 border-r border-[#e6e0db] bg-white dark:bg-[#2d2419] h-screen lg:min-h-screen flex flex-col`}
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}
       >
         <div className="p-6 flex flex-col gap-3 border-b border-[#f5f2f0]">
           <div className="flex items-center">
@@ -295,7 +294,7 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
           )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-4 flex flex-col gap-2 pb-24 lg:pb-4">
+        <nav className="flex-1 overflow-y-auto p-4 flex flex-col gap-2 pb-16">
           {sidebarItems.map((item) => {
             const isActive =
               pathname === item.href ||
@@ -321,7 +320,7 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
           })}
         </nav>
 
-        <div className="p-4 border-t border-[#f5f2f0]">
+        <div className="p-4 border-t border-[#f5f2f0] sticky bottom-0 bg-white dark:bg-[#2d2419]">
           <div className="flex items-center justify-between gap-3 p-2">
             <div className="flex items-center gap-3">
               <div className="size-10 rounded-full border border-[#e6e0db] bg-orange-100 flex items-center justify-center">
