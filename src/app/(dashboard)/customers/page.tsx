@@ -403,7 +403,7 @@ export default function CustomersPage() {
       ) : (
         <div className="bg-white border border-primary/10 rounded-lg">
           {/* Escritorio: tabla */}
-          <div className="hidden md:block">
+          <div className="hidden lg:block">
             <CustomerTable
               customers={paginatedCustomers}
               onToggleExpand={handleToggleExpand}
@@ -412,7 +412,7 @@ export default function CustomersPage() {
           </div>
 
           {/* Mobile: tarjetas */}
-          <div className="md:hidden divide-y divide-primary/10">
+          <div className="lg:hidden divide-y divide-primary/10">
             {paginatedCustomers.map((c) => (
               <div key={c.id} className="px-4 py-3 space-y-2">
                 <div className="flex items-center gap-3">

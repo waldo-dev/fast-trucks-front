@@ -321,7 +321,7 @@ export default function PosHistorialPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a7560]">Terminal POS</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a7560]">Punto de Venta</p>
         <h1 className="text-2xl font-black text-[#181411] dark:text-white">Historial de Pedidos</h1>
         <p className="text-[#8a7560] dark:text-[#a3907d]">
           Consulta y filtra pedidos por rango de fechas, estado y contexto (evento/local).

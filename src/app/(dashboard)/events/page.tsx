@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { eventService, productService } from '@/lib/services';
 import { getCachedUser } from '@/lib/auth';
+import { readOperatingContext } from '@/lib/operatingContext';
 import { toast } from 'react-toastify';
 
 type UiEvent = {
@@ -131,6 +132,7 @@ export default function EventsPage() {
   const [products, setProducts] = useState<Array<{ id: number; name: string }>>([]);
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
   const [productPage, setProductPage] = useState(1);
+  const [operatingContext] = useState(() => readOperatingContext());
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
@@ -138,10 +140,12 @@ export default function EventsPage() {
     setLoading(true);
     setError(null);
     try {
-      const params: Record<string, string | boolean> = {};
+      const params: Record<string, string | boolean | number> = {};
       if (futureOnly) params.future = true;
       if (activeFilter === 'active') params.is_active = true;
       if (activeFilter === 'inactive') params.is_active = false;
+      const bizId = operatingContext?.business_id ?? getCachedUser()?.businessId;
+      if (bizId) params.business_id = bizId;
       const resp = await eventService.list(params as any);
       const data = (resp as any)?.data ?? resp;
       if (Array.isArray(data)) {
@@ -192,7 +196,7 @@ export default function EventsPage() {
     } finally {
       setLoading(false);
     }
-  }, [futureOnly, activeFilter]);
+  }, [futureOnly, activeFilter, operatingContext]);
 
   useEffect(() => {
     fetchEvents();
@@ -204,7 +208,7 @@ export default function EventsPage() {
 
   useEffect(() => {
     const loadProducts = async () => {
-      const businessId = getCachedUser()?.businessId;
+      const businessId = operatingContext?.business_id ?? getCachedUser()?.businessId;
       if (!businessId) return;
       try {
         const resp = await productService.listByOwner({ business_id: businessId });
@@ -226,7 +230,7 @@ export default function EventsPage() {
       }
     };
     loadProducts();
-  }, []);
+  }, [operatingContext]);
 
   const statusOptions = STATUS_OPTIONS;
 
@@ -331,6 +335,7 @@ export default function EventsPage() {
         status: newEvent.status || undefined,
         notes: newEvent.notes || undefined,
         is_active: newEvent.is_active,
+        business_id: operatingContext?.business_id ?? getCachedUser()?.businessId,
         product_ids: selectedProductIds.length ? selectedProductIds : undefined,
         organizers:
           organizers

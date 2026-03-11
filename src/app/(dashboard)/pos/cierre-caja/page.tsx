@@ -20,6 +20,8 @@ type Closeout = {
   payment_breakdown: {
     CASH?: number;
     CARD?: number;
+    DEBIT_CARD?: number;
+    CREDIT_CARD?: number;
     TRANSFER?: number;
     WEBPAY?: number;
     OTHER?: number;
@@ -68,7 +70,7 @@ export default function PosCierreCajaPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<Closeout | null>(null);
-  const [operatingContext, setOperatingContext] = useState<OperatingContext>(null);
+  const [operatingContext] = useState<OperatingContext>(() => readOperatingContext());
 
   const loadCloseout = async () => {
     setLoading(true);
@@ -79,6 +81,9 @@ export default function PosCierreCajaPage() {
         end_date: endOfDayIso(endDate),
         vat_rate: vatRate,
       };
+      if (operatingContext?.business_id) {
+        (params as any).business_id = operatingContext.business_id;
+      }
       if (operatingContext?.type === 'event' && operatingContext.event_id) {
         (params as any).event_id = operatingContext.event_id;
       }
@@ -95,27 +100,28 @@ export default function PosCierreCajaPage() {
   };
 
   useEffect(() => {
-    setOperatingContext(readOperatingContext());
     loadCloseout();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [operatingContext]);
 
   const payments = useMemo(() => {
     const breakdown = data?.payment_breakdown || {};
     const cash = breakdown.CASH || 0;
     const card = breakdown.CARD || 0;
+    const debitCard = breakdown.DEBIT_CARD || 0;
+    const creditCard = breakdown.CREDIT_CARD || 0;
     const transfer = breakdown.TRANSFER || 0;
     const webpay = breakdown.WEBPAY || 0;
     const other = breakdown.OTHER || 0;
-    const total = cash + card + transfer + webpay + other;
-    return { cash, card, transfer, webpay, other, total };
+    const total = cash + card + debitCard + creditCard + transfer + webpay + other;
+    return { cash, card, debitCard, creditCard, transfer, webpay, other, total };
   }, [data]);
 
   return (
     <div className="flex flex-col gap-5">
       <div className="space-y-1">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a7560]">
-          Terminal POS
+          Terminal Punto de Venta
         </p>
         <h1 className="text-2xl font-black text-[#181411] dark:text-white">Cierre de Caja</h1>
         <p className="text-[#8a7560] dark:text-[#a3907d]">
@@ -130,7 +136,13 @@ export default function PosCierreCajaPage() {
             type="date"
             className="border border-primary/20 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#1f1a13]"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(e) => {
+              const nextStart = e.target.value;
+              setStartDate(nextStart);
+              if (endDate && nextStart && endDate < nextStart) {
+                setEndDate(nextStart);
+              }
+            }}
           />
         </div>
         <div className="flex flex-col">
@@ -139,11 +151,12 @@ export default function PosCierreCajaPage() {
             type="date"
             className="border border-primary/20 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#1f1a13]"
             value={endDate}
+            min={startDate || undefined}
             onChange={(e) => setEndDate(e.target.value)}
           />
         </div>
         <div className="flex flex-col">
-          <label className="text-xs font-semibold text-[#8a7560] mb-1">IVA (vat_rate)</label>
+          <label className="text-xs font-semibold text-[#8a7560] mb-1">IVA</label>
           <input
             type="number"
             step="0.01"
@@ -187,8 +200,8 @@ export default function PosCierreCajaPage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           <PaymentCard label="Efectivo" value={formatClp(payments.cash)} />
-          <PaymentCard label="Débito" value={formatClp(payments.card)} />
-          <PaymentCard label="Crédito" value={formatClp(payments.card)} />
+          <PaymentCard label="Débito" value={formatClp(payments.debitCard || payments.card)} />
+          <PaymentCard label="Crédito" value={formatClp(payments.creditCard || payments.card)} />
           <PaymentCard label="Transferencia" value={formatClp(payments.transfer)} />
           <PaymentCard label="Otros (QR / MP / etc.)" value={formatClp(payments.other)} />
           <PaymentCard label="Total recaudado" value={formatClp(payments.total)} highlighted />

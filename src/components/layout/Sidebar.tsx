@@ -33,15 +33,14 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<Awaited<ReturnType<typeof getCurrentUser>>>(getCachedUser());
-  const [operatingContext, setOperatingContext] = useState<OperatingContext>(null);
+  const [operatingContext, setOperatingContext] = useState<OperatingContext>(() => readOperatingContext());
   const [businesses, setBusinesses] = useState<Array<{ id: string; name: string; tier?: string }>>([]);
   const [loadingBiz, setLoadingBiz] = useState(false);
   const role = user?.role?.toUpperCase();
   const isAdmin = role === 'ADMIN';
   const isOperator = role === 'LOCAL_OPERATOR';
   const isOwner = role ? OWNER_ROLES.includes(role as (typeof OWNER_ROLES)[number]) : false;
-  const needsBusinessSelection =
-    !isAdmin && (!operatingContext || operatingContext.type !== 'business' || !operatingContext.business_id);
+  const needsBusinessSelection = !isAdmin && !operatingContext?.business_id;
 
   const roleLabel = (value?: string) => {
     const upper = (value || '').toUpperCase();
@@ -113,11 +112,11 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [operatingContext?.business_id]);
 
-  const contextAwareOperatorItems = OPERATOR_SIDEBAR_ITEMS.map((item) =>
-    item.href === '/pos/cambiar-evento' && operatingContext?.type === 'event'
-      ? { ...item, title: 'Cambiar Local' }
-      : item
-  );
+  const contextAwareOperatorItems = OPERATOR_SIDEBAR_ITEMS.map((item) => {
+    if (item.href !== '/pos/cambiar-evento') return item;
+    const title = operatingContext?.type === 'event' ? 'Cambiar Local' : 'Cambiar Evento';
+    return { ...item, title };
+  });
 
   type SidebarItem = { title: string; href: string; icon: string };
 
@@ -268,7 +267,7 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
             />
           </div>
           <p className="text-[#8a7560] dark:text-[#a3907d] text-xs font-medium">
-            {isAdmin ? 'Panel Admin Global' : isOperator ? 'Terminal POS' : 'Panel Administrador'}
+            {isAdmin ? 'Panel Admin Global' : isOperator ? 'Punto de Venta' : 'Panel Administrador'}
           </p>
           {!isAdmin && (
             <div className="flex flex-col gap-1 text-xs text-[#4b5563] dark:text-[#a3907d]">

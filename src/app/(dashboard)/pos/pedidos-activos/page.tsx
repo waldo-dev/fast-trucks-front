@@ -152,7 +152,7 @@ export default function PosPedidosActivosPage() {
   });
   const [businessFilterId] = useState<string | null>(() => {
     const ctx = readOperatingContext();
-    return ctx?.type === 'business' && ctx.business_id ? String(ctx.business_id) : null;
+    return ctx?.business_id ? String(ctx.business_id) : null;
   });
 
   useEffect(() => {
@@ -162,8 +162,12 @@ export default function PosPedidosActivosPage() {
       try {
         const params: any = {};
         if (status !== 'ALL') params.status = status;
-        if (eventFilterId) params.event_id = eventFilterId;
-        else if (businessFilterId) params.business_id = businessFilterId;
+        if (eventFilterId) {
+          params.event_id = eventFilterId;
+          if (businessFilterId) params.business_id = businessFilterId;
+        } else if (businessFilterId) {
+          params.business_id = businessFilterId;
+        }
         const resp = await orderService.list(params as any);
         const list = (resp as any)?.data ?? resp;
         if (Array.isArray(list)) {
@@ -214,7 +218,7 @@ export default function PosPedidosActivosPage() {
       try {
         const resp = await orderService.list(
           eventFilterId
-            ? ({ event_id: eventFilterId } as any)
+            ? ({ event_id: eventFilterId, ...(businessFilterId ? { business_id: businessFilterId } : {}) } as any)
             : businessFilterId
               ? ({ business_id: businessFilterId } as any)
               : undefined
@@ -304,7 +308,7 @@ export default function PosPedidosActivosPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Terminal POS</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Punto de Venta</p>
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>
             <h1 className="text-3xl font-black text-gray-900">Pedidos Activos</h1>

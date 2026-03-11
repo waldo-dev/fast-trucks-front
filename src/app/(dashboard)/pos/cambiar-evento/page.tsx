@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { eventService, businessService } from '@/lib/services';
+import { readOperatingContext } from '@/lib/operatingContext';
 import { getCachedUser } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
@@ -50,8 +51,13 @@ export default function PosCambiarEventoPage() {
   const [events, setEvents] = useState<UiEvent[]>([]);
   const [businesses, setBusinesses] = useState<Record<string, string>>({});
   const [selectedEventId, setSelectedEventId] = useState<string>('');
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string>(() => {
+    const ctx = readOperatingContext();
+    return ctx?.business_id ? String(ctx.business_id) : getCachedUser()?.businessId ?? '';
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [operatingContext] = useState(() => readOperatingContext());
 
   const loadBusinesses = async () => {
     try {
@@ -82,8 +88,17 @@ export default function PosCambiarEventoPage() {
       setLoading(true);
       setError(null);
       await loadBusinesses();
+      // Si estamos en contexto de evento, no cargamos eventos; solo mostramos locales.
+      if (operatingContext?.type === 'event') {
+        if (active) setLoading(false);
+        return;
+      }
       try {
-        const resp = await eventService.list({ future: true });
+        const params: any = { future: true };
+        if (operatingContext?.business_id) {
+          params.business_id = operatingContext.business_id;
+        }
+        const resp = await eventService.list(params);
         const list = (resp as any)?.data ?? resp;
         if (Array.isArray(list)) {
           const mapped: UiEvent[] = list.map((ev: any, idx: number) => ({
@@ -138,14 +153,14 @@ export default function PosCambiarEventoPage() {
   };
 
   const handleApplyLocal = () => {
-    const businessId = getCachedUser()?.businessId;
+    const businessId = selectedBusinessId || operatingContext?.business_id || getCachedUser()?.businessId;
     if (!businessId) {
       toast.error('No se encontró un local asociado.');
       return;
     }
     setOperatingContext({
       type: 'business',
-      business_id: businessId,
+      business_id: String(businessId),
     });
     toast.success('Contexto actualizado al local. Refrescando POS...');
     router.replace('/pos');
@@ -154,16 +169,22 @@ export default function PosCambiarEventoPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a7560]">Terminal POS</p>
-        <h1 className="text-2xl font-black text-[#181411] dark:text-white">Cambiar a Evento</h1>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a7560]">Punto de Venta</p>
+        <h1 className="text-2xl font-black text-[#181411] dark:text-white">
+          {operatingContext?.type === 'event' ? 'Cambiar a Local' : 'Cambiar a Evento'}
+        </h1>
         <p className="text-[#8a7560] dark:text-[#a3907d]">
-          Selecciona un evento activo para operar el POS en ese contexto. También puedes volver al modo local.
+          {operatingContext?.type === 'event'
+            ? 'Estás en contexto de evento. Selecciona el local para volver a operar en modo local.'
+            : 'Selecciona un evento activo para operar el POS en ese contexto. También puedes volver al modo local.'}
         </p>
       </div>
 
       <div className="bg-white dark:bg-[#2d2419] border border-[#e6e0db] dark:border-[#3d3226] rounded-xl p-5 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-[#181411] dark:text-white">Eventos activos</h2>
+          <h2 className="text-lg font-bold text-[#181411] dark:text-white">
+            {operatingContext?.type === 'event' ? 'Locales' : 'Eventos activos'}
+          </h2>
           <button
             onClick={handleApplyLocal}
             className="px-3 py-2 text-sm font-semibold border border-primary/20 rounded-lg text-[#181411] hover:bg-primary/5"
@@ -178,7 +199,30 @@ export default function PosCambiarEventoPage() {
           </div>
         )}
 
-        {loading ? (
+        {operatingContext?.type === 'event' ? (
+          <div className="space-y-3">
+            {loading ? (
+              <div className="text-sm text-[#8a7560]">Cargando locales...</div>
+            ) : Object.keys(businesses).length === 0 ? (
+              <div className="text-sm text-[#8a7560]">No hay locales disponibles.</div>
+            ) : (
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-[#181411]">Selecciona un local</label>
+                <select
+                  className="w-full h-11 rounded-lg border border-[#e6e0db] bg-white dark:bg-[#2d2419] dark:border-[#3d3226] px-3 text-sm"
+                  value={selectedBusinessId}
+                  onChange={(e) => setSelectedBusinessId(e.target.value)}
+                >
+                  {Object.entries(businesses).map(([id, name]) => (
+                    <option key={id} value={id}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        ) : loading ? (
           <div className="text-sm text-[#8a7560]">Cargando eventos...</div>
         ) : events.length === 0 ? (
           <div className="text-sm text-[#8a7560]">No hay eventos activos.</div>
@@ -228,11 +272,18 @@ export default function PosCambiarEventoPage() {
 
         <div className="flex justify-end">
           <button
-            onClick={handleApplyEvent}
-            disabled={!selectedEventId || loading}
+            onClick={operatingContext?.type === 'event' ? handleApplyLocal : handleApplyEvent}
+            disabled={
+              loading ||
+              (operatingContext?.type === 'event' ? !selectedBusinessId : !selectedEventId)
+            }
             className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-60"
           >
-            {loading ? 'Cargando...' : 'Cambiar a evento'}
+            {loading
+              ? 'Cargando...'
+              : operatingContext?.type === 'event'
+              ? 'Cambiar a local'
+              : 'Cambiar a evento'}
           </button>
         </div>
       </div>
