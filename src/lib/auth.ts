@@ -30,6 +30,7 @@ type LoginApiResponse = {
   data: {
     token: string;
     refreshToken?: string;
+    refresh_token?: string;
     role?: string;
     businessId?: string | number;
     business_id?: string | number;
@@ -105,9 +106,10 @@ const mapToStoredUser = (
 };
 
 const normalizeLoginResponse = (data: LoginApiResponse['data']): NormalizedSession => {
+  const refresh = data.refreshToken ?? (data as any)?.refresh_token;
   return {
     accessToken: data.token,
-    refreshToken: data.refreshToken,
+    refreshToken: refresh,
     user: mapToStoredUser(data.user, {
       business_id: data.business_id,
       businessId: data.businessId,
@@ -134,6 +136,11 @@ const storeSession = (data: NormalizedSession) => {
   other.removeItem(ACCESS_TOKEN_KEY);
   other.removeItem(REFRESH_TOKEN_KEY);
   other.removeItem(USER_KEY);
+
+  // Limpia la actual antes de escribir
+  storage.removeItem(ACCESS_TOKEN_KEY);
+  storage.removeItem(REFRESH_TOKEN_KEY);
+  storage.removeItem(USER_KEY);
 
   storage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
   if (data.refreshToken) {
@@ -251,9 +258,13 @@ export const refreshSession = async (): Promise<string | null> => {
   if (!refreshToken) return null;
 
   try {
-    const response = await api.post<LoginApiResponse>('/auth/refresh', {
-      refreshToken,
-    });
+    const response = await api.post<LoginApiResponse>(
+      '/auth/refresh',
+      {
+        refresh_token: refreshToken,
+      },
+      { auth: false }
+    );
     // Reutiliza la preferencia de remember según dónde estaba guardado el refresh
     if (!response?.success || !response.data?.token) {
       throw new Error('No se pudo refrescar la sesión');
