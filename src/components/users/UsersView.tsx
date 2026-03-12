@@ -41,7 +41,7 @@ export const UsersView = ({ scope }: UsersViewProps) => {
   const [editingUser, setEditingUser] = useState<NormalizedUser | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const pageSize = 15;
   const [form, setForm] = useState<{
     name: string;
     email: string;
