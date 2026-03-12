@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { orderService } from '@/lib/services';
 import { toast } from 'react-toastify';
 
@@ -136,6 +137,7 @@ const formatPaymentLabel = (pay?: string) => {
 };
 
 export default function PosPedidosActivosPage() {
+  const router = useRouter();
   const [status, setStatus] = useState<StatusValue>('CREATED');
   const [orders, setOrders] = useState<UiOrder[]>([]);
   const [summaryCounts, setSummaryCounts] = useState<Record<StatusValue, number>>(emptyCounts);
@@ -284,6 +286,11 @@ export default function PosPedidosActivosPage() {
         ? `Local ID: ${businessFilterId}`
         : 'Modo local';
 
+  const handleOpenDetail = (orderId: string) => {
+    if (!orderId) return;
+    router.push(`/pos/pedidos-activos/${orderId}`);
+  };
+
   const handleStatusChange = async (orderId: string, nextStatus: StatusValue) => {
     if (!nextStatus || nextStatus === 'ALL') return;
     setUpdatingId(orderId);
@@ -411,7 +418,11 @@ export default function PosPedidosActivosPage() {
                 </thead>
                 <tbody className="divide-y divide-primary/10 bg-white">
                   {paginatedOrders.map((o) => (
-                    <tr key={o.id} className="hover:bg-primary/5">
+                    <tr
+                      key={o.id}
+                      className="hover:bg-primary/5 cursor-pointer"
+                      onClick={() => handleOpenDetail(o.backendId)}
+                    >
                       <td className="px-4 py-3">
                         <div className="flex flex-col">
                           <span className="font-semibold text-gray-900">{o.code}</span>
@@ -460,6 +471,7 @@ export default function PosPedidosActivosPage() {
                             className="border border-primary/20 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-primary/20"
                             value={o.status}
                             onChange={(e) => handleStatusChange(o.backendId, e.target.value as StatusValue)}
+                            onClick={(e) => e.stopPropagation()}
                             disabled={updatingId === o.backendId}
                           >
                             {STATUS_OPTIONS.filter((s) => s.value !== 'ALL').map((s) => (
@@ -484,7 +496,11 @@ export default function PosPedidosActivosPage() {
               {paginatedOrders.map((o) => {
                 const statusOpt = STATUS_OPTIONS.find((s) => s.value === o.status) || STATUS_OPTIONS[1];
                 return (
-                  <div key={o.id} className="px-4 py-3 space-y-2">
+                  <div
+                    key={o.id}
+                    className="px-4 py-3 space-y-2 cursor-pointer hover:bg-primary/5"
+                    onClick={() => handleOpenDetail(o.backendId)}
+                  >
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-semibold text-gray-900">{o.code}</p>
@@ -525,6 +541,7 @@ export default function PosPedidosActivosPage() {
                           className="border border-primary/20 rounded-lg px-2 py-1 text-sm bg-white focus:ring-2 focus:ring-primary/20"
                           value={o.status}
                           onChange={(e) => handleStatusChange(o.backendId, e.target.value as StatusValue)}
+                          onClick={(e) => e.stopPropagation()}
                           disabled={updatingId === o.backendId}
                         >
                           {STATUS_OPTIONS.filter((s) => s.value !== 'ALL').map((s) => (

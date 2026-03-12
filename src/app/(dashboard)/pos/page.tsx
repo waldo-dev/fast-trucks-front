@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { businessService, eventService, productService, orderService } from '@/lib/services';
+import { useRouter } from 'next/navigation';
+import { eventService, productService, orderService } from '@/lib/services';
 import { config } from '@/lib/config';
-import { getCachedUser } from '@/lib/auth';
 import { toast } from 'react-toastify';
 
 type UiProduct = {
@@ -37,7 +37,7 @@ const readOperatingContext = (): OperatingContext => {
 };
 
 export default function PosPage() {
-  const [businesses, setBusinesses] = useState<Array<{ id: string; name: string }>>([]);
+  const router = useRouter();
   const [selectedBusiness, setSelectedBusiness] = useState<string>('');
   const [events, setEvents] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedEvent, setSelectedEvent] = useState<string>('');
@@ -58,8 +58,6 @@ export default function PosPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [operatingContext, setOperatingContext] = useState<OperatingContext>(null);
   const [contextApplied, setContextApplied] = useState(false);
-
-  const cachedBusinessId = getCachedUser()?.businessId;
 
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const isEventOrder = eventMode && !!selectedEvent;
@@ -198,11 +196,23 @@ const friendlyOrderError = (err: any) => {
         },
       };
 
-      await toast.promise(orderService.create(payload), {
+      const created = await toast.promise(orderService.create(payload), {
         pending: 'Creando orden...',
         success: 'Orden creada correctamente',
         error: 'No se pudo crear la orden',
       });
+
+      const createdData = (created as any)?.data ?? created;
+      const newId =
+        createdData?.id ??
+        createdData?.code ??
+        createdData?.external_id ??
+        createdData?.order_id;
+      if (newId) {
+        router.push(`/pos/pedidos-activos/${encodeURIComponent(String(newId))}`);
+      } else {
+        toast.warn('Orden creada pero no se pudo abrir el detalle automáticamente.');
+      }
 
       setCart([]);
       setCustomer({ name: '', phone: '', email: '' });
@@ -293,36 +303,6 @@ const friendlyOrderError = (err: any) => {
   }, [eventMode, selectedEvent, events, operatingContext]);
 
   useEffect(() => {
-    const loadBasics = async () => {
-      try {
-        const resp = await businessService.list();
-        const list = (resp as any)?.data ?? resp;
-        const mapped =
-          Array.isArray(list) && list.length
-            ? list.map((b: any) => ({
-              id: String(b.id),
-              name: b.name || b.brand_name || 'Sin nombre',
-            }))
-            : [];
-        setBusinesses(mapped);
-        setSelectedBusiness((prev) => {
-          if (prev) return prev;
-          if (mapped.length === 1) {
-            return mapped[0].id;
-          }
-          if (cachedBusinessId) {
-            const found = mapped.find((b) => b.id === String(cachedBusinessId));
-            if (found) return found.id;
-          }
-          return prev;
-        });
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : 'No se pudieron cargar los locales'
-        );
-      }
-    };
-
     const loadEvents = async () => {
       try {
         const resp = await eventService.list({ future: true });
@@ -340,9 +320,8 @@ const friendlyOrderError = (err: any) => {
       }
     };
 
-    loadBasics();
     loadEvents();
-  }, [cachedBusinessId]);
+  }, []);
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -386,6 +365,128 @@ const friendlyOrderError = (err: any) => {
     loadProducts();
   }, [selectedBusiness]);
 
+  const CustomerForm = () => (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="md:col-span-1">
+          <label className="block text-xs font-semibold text-gray-600 mb-1">
+            Nombre del cliente *
+          </label>
+          <input
+            className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+            placeholder="Ej: Juan Pérez"
+            value={customer.name}
+            onChange={(e) => setCustomer((c) => ({ ...c, name: e.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">
+            Teléfono (opcional)
+          </label>
+          <input
+            className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+            placeholder="+56 9 1234 5678"
+            value={customer.phone}
+            onChange={(e) => setCustomer((c) => ({ ...c, phone: e.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">
+            Correo (opcional)
+          </label>
+          <input
+            className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+            placeholder="cliente@correo.com"
+            value={customer.email}
+            onChange={(e) => setCustomer((c) => ({ ...c, email: e.target.value }))}
+          />
+        </div>
+        {eventMode ? (
+          selectedEvent ? (
+            <div className="flex flex-col justify-end gap-1">
+              <span className="text-[11px] font-semibold text-gray-600">Entrega</span>
+              <span className="text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                Retiro inmediato en evento
+              </span>
+            </div>
+          ) : (
+            <div className="flex flex-col justify-end gap-1">
+              <span className="text-[11px] font-semibold text-gray-600">Entrega</span>
+              <span className="text-sm text-gray-600 bg-background-light border border-primary/20 rounded-lg px-3 py-2">
+                Selecciona un evento para elegir el tipo de entrega
+              </span>
+            </div>
+          )
+        ) : (
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Tipo de entrega
+            </label>
+            <select
+              className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+              value={orderType}
+              onChange={(e) => setOrderType(e.target.value as 'pickup' | 'delivery')}
+            >
+              <option value="pickup">Retiro en local</option>
+              <option value="delivery">Delivery</option>
+            </select>
+          </div>
+        )}
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">
+            Método de pago *
+          </label>
+          <select
+            className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+            value={paymentMethod}
+            onChange={(e) =>
+              setPaymentMethod(
+                e.target.value as
+                  | 'CASH'
+                  | 'TRANSFER'
+                  | 'WEBPAY'
+                  | 'DEBIT_CARD'
+                  | 'CREDIT_CARD'
+              )
+            }
+          >
+            <option value="CASH">Efectivo</option>
+            <option value="DEBIT_CARD">Tarjeta Debito</option>
+            <option value="CREDIT_CARD">Tarjeta Credito</option>
+            <option value="TRANSFER">Transferencia</option>
+            <option value="WEBPAY">Webpay</option>
+          </select>
+        </div>
+      </div>
+      {!isEventOrder && orderType === 'delivery' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="md:col-span-2">
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Dirección de entrega *
+            </label>
+            <input
+              className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+              placeholder="Calle, número, comuna"
+              value={deliveryAddress}
+              onChange={(e) => setDeliveryAddress(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Referencia (opcional)
+            </label>
+            <input
+              className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+              placeholder="Depto, piso, indicaciones"
+              value={deliveryNotes}
+              onChange={(e) => setDeliveryNotes(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-4 lg:gap-6">
       {/* Encabezado */}
@@ -400,7 +501,7 @@ const friendlyOrderError = (err: any) => {
                 Punto de venta
               </p>
               <div className="text-xs text-gray-500">
-                {selectedBusiness ? 'Local seleccionado' : 'Selecciona un local'}
+                {selectedBusiness ? 'Local activo' : 'Sin local seleccionado'}
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -421,55 +522,25 @@ const friendlyOrderError = (err: any) => {
                 </span>
               )}
             </div>
-            <div className="flex flex-col xl:flex-row xl:items-center xl:gap-3 gap-2">
-              <select
-                className="bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 outline-none w-full xl:w-64"
-                value={selectedBusiness}
-                onChange={(e) => setSelectedBusiness(e.target.value)}
-              >
-                <option value="">{businesses.length > 0 ? 'Selecciona un local' : 'Sin locales'}</option>
-                {businesses.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-              {/*  <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="accent-primary"
-                    checked={eventMode}
-                    onChange={(e) => {
-                      const enabled = e.target.checked;
-                      setEventMode(enabled);
-                      if (!enabled) {
-                        setSelectedEvent('');
-                        setOrderType('pickup');
-                      }
-                    }}
-                  />
-                  POS en evento
-                </label>*/}
-                {events.length > 0 && (
-                  <select
-                    className="bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 outline-none w-full sm:w-56 disabled:opacity-50 disabled:cursor-not-allowed"
-                    value={selectedEvent}
-                    onChange={(e) => {
-                      setSelectedEvent(e.target.value);
-                      setEventMode(true);
-                    }}
-                    disabled={!eventMode}
-                  >
-                    <option value="">Selecciona evento</option>
-                    {events.map((ev) => (
-                      <option key={ev.id} value={ev.id}>
-                        {ev.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+              {events.length > 0 && (
+                <select
+                  className="bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 outline-none w-full sm:w-56"
+                  value={selectedEvent}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSelectedEvent(value);
+                    setEventMode(!!value);
+                  }}
+                >
+                  <option value="">Selecciona evento</option>
+                  {events.map((ev) => (
+                    <option key={ev.id} value={ev.id}>
+                      {ev.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
         </div>
@@ -494,6 +565,15 @@ const friendlyOrderError = (err: any) => {
           </button>
         </div>
       </header>
+
+      {/* Datos del cliente (mobile primero) */}
+      <div className="md:hidden bg-white border border-primary/10 rounded-xl p-4 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="material-symbols-outlined text-primary">person</span>
+          <h3 className="font-bold text-gray-900">Datos del cliente</h3>
+        </div>
+        <CustomerForm />
+      </div>
 
       {/* Contenido principal responsive */}
       <div className="grid grid-cols-1 xl:grid-cols-[1.3fr,1fr] gap-4 lg:gap-6">
@@ -581,209 +661,97 @@ const friendlyOrderError = (err: any) => {
           </div>
 
           <div className="flex-1 overflow-y-auto pr-1 space-y-3">
+            <div className="hidden md:block">
+              <CustomerForm />
+            </div>
+
+            {error && (
+              <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {error}
+              </div>
+            )}
+
             {cart.length === 0 ? (
               <p className="text-sm text-gray-500">Aún no has agregado productos.</p>
             ) : (
-              <div className="flex flex-col gap-3">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="md:col-span-1">
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Nombre del cliente *
-                    </label>
-                    <input
-                      className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
-                      placeholder="Ej: Juan Pérez"
-                      value={customer.name}
-                      onChange={(e) => setCustomer((c) => ({ ...c, name: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Teléfono (opcional)
-                    </label>
-                    <input
-                      className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
-                      placeholder="+56 9 1234 5678"
-                      value={customer.phone}
-                      onChange={(e) => setCustomer((c) => ({ ...c, phone: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Correo (opcional)
-                    </label>
-                    <input
-                      className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
-                      placeholder="cliente@correo.com"
-                      value={customer.email}
-                      onChange={(e) => setCustomer((c) => ({ ...c, email: e.target.value }))}
-                    />
-                  </div>
-                  {eventMode ? (
-                    selectedEvent ? (
-                      <div className="flex flex-col justify-end gap-1">
-                        <span className="text-[11px] font-semibold text-gray-600">
-                          Entrega
-                        </span>
-                        <span className="text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                          Retiro inmediato en evento
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col justify-end gap-1">
-                        <span className="text-[11px] font-semibold text-gray-600">Entrega</span>
-                        <span className="text-sm text-gray-600 bg-background-light border border-primary/20 rounded-lg px-3 py-2">
-                          Selecciona un evento para elegir el tipo de entrega
-                        </span>
-                      </div>
-                    )
-                  ) : (
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">
-                        Tipo de entrega
-                      </label>
-                      <select
-                        className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
-                        value={orderType}
-                        onChange={(e) => setOrderType(e.target.value as 'pickup' | 'delivery')}
-                      >
-                        <option value="pickup">Retiro en local</option>
-                        <option value="delivery">Delivery</option>
-                      </select>
-                    </div>
-                  )}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Método de pago *
-                    </label>
-                    <select
-                      className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
-                      value={paymentMethod}
-                      onChange={(e) =>
-                        setPaymentMethod(e.target.value as 'CASH' | 'TRANSFER' | 'WEBPAY' | 'DEBIT_CARD' | 'CREDIT_CARD')
-                      }
-                    >
-                      <option value="CASH">Efectivo</option>
-                      <option value="DEBIT_CARD">Tarjeta Debito</option>
-                      <option value="CREDIT_CARD">Tarjeta Credito</option>
-                      <option value="TRANSFER">Transferencia</option>
-                      <option value="WEBPAY">Webpay</option>
-                    </select>
-                  </div>
-                </div>
-                {!isEventOrder && orderType === 'delivery' && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="md:col-span-2">
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">
-                        Dirección de entrega *
-                      </label>
-                      <input
-                        className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
-                        placeholder="Calle, número, comuna"
-                        value={deliveryAddress}
-                        onChange={(e) => setDeliveryAddress(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">
-                        Referencia (opcional)
-                      </label>
-                      <input
-                        className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
-                        placeholder="Depto, piso, indicaciones"
-                        value={deliveryNotes}
-                        onChange={(e) => setDeliveryNotes(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                )}
-                {error && (
-                  <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                    {error}
-                  </div>
-                )}
-                <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
-                  {cart.map((item) => (
+              <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
+                {cart.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-3 bg-background-light rounded-lg p-2 border border-primary/10"
+                  >
                     <div
-                      key={item.id}
-                      className="flex items-center gap-3 bg-background-light rounded-lg p-2 border border-primary/10"
-                    >
-                      <div
-                        className="size-12 rounded-md bg-cover bg-center border border-primary/10"
-                        style={{ backgroundImage: `url('${item.image}')` }}
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-gray-900">{item.name}</p>
-                        <p className="text-xs text-gray-500">{item.category || 'Sin categoría'}</p>
-                        <p className="text-primary font-bold">{item.price}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          className="size-8 rounded-full bg-white border border-primary/20 text-primary flex items-center justify-center hover:bg-primary/5"
-                          onClick={() =>
-                            setCart((prev) =>
-                              prev
-                                .map((p) =>
-                                  p.id === item.id
-                                    ? { ...p, quantity: Math.max(0, p.quantity - 1) }
-                                    : p
-                                )
-                                .filter((p) => p.quantity > 0)
-                            )
-                          }
-                        >
-                          <span className="material-symbols-outlined text-base">remove</span>
-                        </button>
-                        <span className="w-6 text-center text-sm font-semibold">{item.quantity}</span>
-                        <button
-                          className="size-8 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90"
-                          onClick={() =>
-                            setCart((prev) =>
-                              prev.map((p) =>
-                                p.id === item.id ? { ...p, quantity: p.quantity + 1 } : p
-                              )
-                            )
-                          }
-                        >
-                          <span className="material-symbols-outlined text-base">add</span>
-                        </button>
-                      </div>
+                      className="size-12 rounded-md bg-cover bg-center border border-primary/10"
+                      style={{ backgroundImage: `url('${item.image}')` }}
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-gray-900">{item.name}</p>
+                      <p className="text-xs text-gray-500">{item.category || 'Sin categoría'}</p>
+                      <p className="text-primary font-bold">{item.price}</p>
                     </div>
-                  ))}
-                </div>
-
-                <div className="flex items-center justify-between text-sm font-semibold text-gray-800">
-                  <span>Total</span>
-                  <span className="text-primary text-lg">
-                    {formatClp(
-                      cart.reduce(
-                        (acc, item) => acc + item.numericPrice * item.quantity,
-                        0
-                      )
-                    )}
-                  </span>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    className={`flex-1 rounded-lg py-3 font-bold transition-colors ${canCheckout
-                        ? 'bg-primary text-white hover:bg-primary/90'
-                        : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                      }`}
-                    onClick={handleContinue}
-                    disabled={!canCheckout || submittingOrder}
-                  >
-                    {submittingOrder ? 'Creando...' : 'Continuar'}
-                  </button>
-                  <button
-                    className="px-4 py-3 rounded-lg border border-primary/20 text-gray-700 hover:bg-primary/5"
-                    onClick={() => setCart([])}
-                  >
-                    Vaciar
-                  </button>
-                </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="size-8 rounded-full bg-white border border-primary/20 text-primary flex items-center justify-center hover:bg-primary/5"
+                        onClick={() =>
+                          setCart((prev) =>
+                            prev
+                              .map((p) =>
+                                p.id === item.id
+                                  ? { ...p, quantity: Math.max(0, p.quantity - 1) }
+                                  : p
+                              )
+                              .filter((p) => p.quantity > 0)
+                          )
+                        }
+                      >
+                        <span className="material-symbols-outlined text-base">remove</span>
+                      </button>
+                      <span className="w-6 text-center text-sm font-semibold">{item.quantity}</span>
+                      <button
+                        className="size-8 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90"
+                        onClick={() =>
+                          setCart((prev) =>
+                            prev.map((p) =>
+                              p.id === item.id ? { ...p, quantity: p.quantity + 1 } : p
+                            )
+                          )
+                        }
+                      >
+                        <span className="material-symbols-outlined text-base">add</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
+
+            <div className="flex items-center justify-between text-sm font-semibold text-gray-800">
+              <span>Total</span>
+              <span className="text-primary text-lg">
+                {formatClp(
+                  cart.reduce((acc, item) => acc + item.numericPrice * item.quantity, 0)
+                )}
+              </span>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                className={`flex-1 rounded-lg py-3 font-bold transition-colors ${canCheckout
+                    ? 'bg-primary text-white hover:bg-primary/90'
+                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  }`}
+                onClick={handleContinue}
+                disabled={!canCheckout || submittingOrder}
+              >
+                {submittingOrder ? 'Creando...' : 'Continuar'}
+              </button>
+              <button
+                className="px-4 py-3 rounded-lg border border-primary/20 text-gray-700 hover:bg-primary/5"
+                onClick={() => setCart([])}
+              >
+                Vaciar
+              </button>
+            </div>
           </div>
         </div>
         {confirmOpen && (
