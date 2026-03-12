@@ -23,6 +23,165 @@ type OperatingContext =
   | { type: 'business'; business_id?: string }
   | null;
 
+type CustomerFormProps = {
+  customer: { name: string; phone: string; email: string };
+  setCustomer: React.Dispatch<
+    React.SetStateAction<{ name: string; phone: string; email: string }>
+  >;
+  orderType: 'pickup' | 'delivery';
+  setOrderType: React.Dispatch<React.SetStateAction<'pickup' | 'delivery'>>;
+  eventMode: boolean;
+  selectedEvent: string;
+  paymentMethod: 'CASH' | 'CARD' | 'TRANSFER' | 'WEBPAY' | 'CREDIT_CARD' | 'DEBIT_CARD';
+  setPaymentMethod: React.Dispatch<
+    React.SetStateAction<
+      'CASH' | 'CARD' | 'TRANSFER' | 'WEBPAY' | 'CREDIT_CARD' | 'DEBIT_CARD'
+    >
+  >;
+  isEventOrder: boolean;
+  deliveryAddress: string;
+  setDeliveryAddress: React.Dispatch<React.SetStateAction<string>>;
+  deliveryNotes: string;
+  setDeliveryNotes: React.Dispatch<React.SetStateAction<string>>;
+};
+
+const CustomerForm = ({
+  customer,
+  setCustomer,
+  orderType,
+  setOrderType,
+  eventMode,
+  selectedEvent,
+  paymentMethod,
+  setPaymentMethod,
+  isEventOrder,
+  deliveryAddress,
+  setDeliveryAddress,
+  deliveryNotes,
+  setDeliveryNotes,
+}: CustomerFormProps) => (
+  <div className="flex flex-col gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="md:col-span-1">
+        <label className="block text-xs font-semibold text-gray-600 mb-1">
+          Nombre del cliente *
+        </label>
+        <input
+          className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+          placeholder="Ej: Juan Pérez"
+          value={customer.name}
+          onChange={(e) => setCustomer((c) => ({ ...c, name: e.target.value }))}
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">
+          Teléfono (opcional)
+        </label>
+        <input
+          className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+          placeholder="+56 9 1234 5678"
+          value={customer.phone}
+          onChange={(e) => setCustomer((c) => ({ ...c, phone: e.target.value }))}
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">
+          Correo (opcional)
+        </label>
+        <input
+          className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+          placeholder="cliente@correo.com"
+          value={customer.email}
+          onChange={(e) => setCustomer((c) => ({ ...c, email: e.target.value }))}
+        />
+      </div>
+      {eventMode ? (
+        selectedEvent ? (
+          <div className="flex flex-col justify-end gap-1">
+            <span className="text-[11px] font-semibold text-gray-600">Entrega</span>
+            <span className="text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+              Retiro inmediato en evento
+            </span>
+          </div>
+        ) : (
+          <div className="flex flex-col justify-end gap-1">
+            <span className="text-[11px] font-semibold text-gray-600">Entrega</span>
+            <span className="text-sm text-gray-600 bg-background-light border border-primary/20 rounded-lg px-3 py-2">
+              Selecciona un evento para elegir el tipo de entrega
+            </span>
+          </div>
+        )
+      ) : (
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">
+            Tipo de entrega
+          </label>
+          <select
+            className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+            value={orderType}
+            onChange={(e) => setOrderType(e.target.value as 'pickup' | 'delivery')}
+          >
+            <option value="pickup">Retiro en local</option>
+            <option value="delivery">Delivery</option>
+          </select>
+        </div>
+      )}
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">
+          Método de pago *
+        </label>
+        <select
+          className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+          value={paymentMethod}
+          onChange={(e) =>
+            setPaymentMethod(
+              e.target.value as
+                | 'CASH'
+                | 'CARD'
+                | 'TRANSFER'
+                | 'WEBPAY'
+                | 'CREDIT_CARD'
+                | 'DEBIT_CARD'
+            )
+          }
+        >
+          <option value="CASH">Efectivo</option>
+          <option value="DEBIT_CARD">Tarjeta Debito</option>
+          <option value="CREDIT_CARD">Tarjeta Credito</option>
+          <option value="TRANSFER">Transferencia</option>
+          <option value="WEBPAY">Webpay</option>
+        </select>
+      </div>
+    </div>
+    {!isEventOrder && orderType === 'delivery' && (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="md:col-span-2">
+          <label className="block text-xs font-semibold text-gray-600 mb-1">
+            Dirección de entrega *
+          </label>
+          <input
+            className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+            placeholder="Calle, número, comuna"
+            value={deliveryAddress}
+            onChange={(e) => setDeliveryAddress(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">
+            Referencia (opcional)
+          </label>
+          <input
+            className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
+            placeholder="Depto, piso, indicaciones"
+            value={deliveryNotes}
+            onChange={(e) => setDeliveryNotes(e.target.value)}
+          />
+        </div>
+      </div>
+    )}
+  </div>
+);
+
 const readOperatingContext = (): OperatingContext => {
   if (typeof window === 'undefined') return null;
   const raw =
@@ -365,128 +524,6 @@ const friendlyOrderError = (err: any) => {
     loadProducts();
   }, [selectedBusiness]);
 
-  const CustomerForm = () => (
-    <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="md:col-span-1">
-          <label className="block text-xs font-semibold text-gray-600 mb-1">
-            Nombre del cliente *
-          </label>
-          <input
-            className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
-            placeholder="Ej: Juan Pérez"
-            value={customer.name}
-            onChange={(e) => setCustomer((c) => ({ ...c, name: e.target.value }))}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1">
-            Teléfono (opcional)
-          </label>
-          <input
-            className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
-            placeholder="+56 9 1234 5678"
-            value={customer.phone}
-            onChange={(e) => setCustomer((c) => ({ ...c, phone: e.target.value }))}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1">
-            Correo (opcional)
-          </label>
-          <input
-            className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
-            placeholder="cliente@correo.com"
-            value={customer.email}
-            onChange={(e) => setCustomer((c) => ({ ...c, email: e.target.value }))}
-          />
-        </div>
-        {eventMode ? (
-          selectedEvent ? (
-            <div className="flex flex-col justify-end gap-1">
-              <span className="text-[11px] font-semibold text-gray-600">Entrega</span>
-              <span className="text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                Retiro inmediato en evento
-              </span>
-            </div>
-          ) : (
-            <div className="flex flex-col justify-end gap-1">
-              <span className="text-[11px] font-semibold text-gray-600">Entrega</span>
-              <span className="text-sm text-gray-600 bg-background-light border border-primary/20 rounded-lg px-3 py-2">
-                Selecciona un evento para elegir el tipo de entrega
-              </span>
-            </div>
-          )
-        ) : (
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">
-              Tipo de entrega
-            </label>
-            <select
-              className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
-              value={orderType}
-              onChange={(e) => setOrderType(e.target.value as 'pickup' | 'delivery')}
-            >
-              <option value="pickup">Retiro en local</option>
-              <option value="delivery">Delivery</option>
-            </select>
-          </div>
-        )}
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1">
-            Método de pago *
-          </label>
-          <select
-            className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
-            value={paymentMethod}
-            onChange={(e) =>
-              setPaymentMethod(
-                e.target.value as
-                  | 'CASH'
-                  | 'TRANSFER'
-                  | 'WEBPAY'
-                  | 'DEBIT_CARD'
-                  | 'CREDIT_CARD'
-              )
-            }
-          >
-            <option value="CASH">Efectivo</option>
-            <option value="DEBIT_CARD">Tarjeta Debito</option>
-            <option value="CREDIT_CARD">Tarjeta Credito</option>
-            <option value="TRANSFER">Transferencia</option>
-            <option value="WEBPAY">Webpay</option>
-          </select>
-        </div>
-      </div>
-      {!isEventOrder && orderType === 'delivery' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="md:col-span-2">
-            <label className="block text-xs font-semibold text-gray-600 mb-1">
-              Dirección de entrega *
-            </label>
-            <input
-              className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
-              placeholder="Calle, número, comuna"
-              value={deliveryAddress}
-              onChange={(e) => setDeliveryAddress(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">
-              Referencia (opcional)
-            </label>
-            <input
-              className="w-full bg-background-light border border-primary/20 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white"
-              placeholder="Depto, piso, indicaciones"
-              value={deliveryNotes}
-              onChange={(e) => setDeliveryNotes(e.target.value)}
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
   return (
     <div className="flex flex-col gap-4 lg:gap-6">
       {/* Encabezado */}
@@ -572,7 +609,21 @@ const friendlyOrderError = (err: any) => {
           <span className="material-symbols-outlined text-primary">person</span>
           <h3 className="font-bold text-gray-900">Datos del cliente</h3>
         </div>
-        <CustomerForm />
+        <CustomerForm
+          customer={customer}
+          setCustomer={setCustomer}
+          orderType={orderType}
+          setOrderType={setOrderType}
+          eventMode={eventMode}
+          selectedEvent={selectedEvent}
+          paymentMethod={paymentMethod}
+          setPaymentMethod={setPaymentMethod}
+          isEventOrder={isEventOrder}
+          deliveryAddress={deliveryAddress}
+          setDeliveryAddress={setDeliveryAddress}
+          deliveryNotes={deliveryNotes}
+          setDeliveryNotes={setDeliveryNotes}
+        />
       </div>
 
       {/* Contenido principal responsive */}
@@ -662,7 +713,21 @@ const friendlyOrderError = (err: any) => {
 
           <div className="flex-1 overflow-y-auto pr-1 space-y-3">
             <div className="hidden md:block">
-              <CustomerForm />
+              <CustomerForm
+                customer={customer}
+                setCustomer={setCustomer}
+                orderType={orderType}
+                setOrderType={setOrderType}
+                eventMode={eventMode}
+                selectedEvent={selectedEvent}
+                paymentMethod={paymentMethod}
+                setPaymentMethod={setPaymentMethod}
+                isEventOrder={isEventOrder}
+                deliveryAddress={deliveryAddress}
+                setDeliveryAddress={setDeliveryAddress}
+                deliveryNotes={deliveryNotes}
+                setDeliveryNotes={setDeliveryNotes}
+              />
             </div>
 
             {error && (
