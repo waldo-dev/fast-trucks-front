@@ -6,6 +6,10 @@ import { config } from './config';
  */
 type ApiRequestOptions = RequestInit & { auth?: boolean };
 
+const ACCESS_TOKEN_KEY = 'fasttrucks_access_token';
+const REFRESH_TOKEN_KEY = 'fasttrucks_refresh_token';
+const USER_KEY = 'fasttrucks_user';
+
 class ApiClient {
   private baseUrl: string;
   private timeout: number;
@@ -18,9 +22,62 @@ class ApiClient {
   private getStoredToken() {
     if (typeof window === 'undefined') return null;
     return (
-      localStorage.getItem('fasttrucks_access_token') ||
-      sessionStorage.getItem('fasttrucks_access_token')
+      localStorage.getItem(ACCESS_TOKEN_KEY) ||
+      sessionStorage.getItem(ACCESS_TOKEN_KEY)
     );
+  }
+
+  private getRefreshToken() {
+    if (typeof window === 'undefined') return null;
+    return (
+      localStorage.getItem(REFRESH_TOKEN_KEY) ||
+      sessionStorage.getItem(REFRESH_TOKEN_KEY)
+    );
+  }
+
+  private persistTokens(accessToken: string, refreshToken?: string) {
+    if (typeof window === 'undefined') return;
+    const storage = localStorage;
+    [ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY].forEach((key) => {
+      storage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
+    storage.setItem(ACCESS_TOKEN_KEY, accessToken);
+    if (refreshToken) storage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  }
+
+  private clearSession() {
+    if (typeof window === 'undefined') return;
+    [localStorage, sessionStorage].forEach((store) => {
+      store.removeItem(ACCESS_TOKEN_KEY);
+      store.removeItem(REFRESH_TOKEN_KEY);
+      store.removeItem(USER_KEY);
+    });
+  }
+
+  private async refreshAccessToken(): Promise<string | null> {
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) return null;
+
+    try {
+      const resp = await fetch(`${this.baseUrl}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (!resp.ok) return null;
+      const data: any = await resp.json();
+      const token = data?.data?.token ?? data?.token;
+      const newRefresh =
+        data?.data?.refreshToken ?? data?.data?.refresh_token ?? data?.refresh_token;
+      if (!token) return null;
+
+      this.persistTokens(token, newRefresh);
+      return token;
+    } catch {
+      return null;
+    }
   }
 
   private async request<T>(
@@ -38,16 +95,31 @@ class ApiClient {
       typeof FormData !== 'undefined' &&
       restOptions.body instanceof FormData;
 
-    try {
-      const response = await fetch(url, {
+    const doFetch = async (maybeToken?: string) => {
+      return fetch(url, {
         ...restOptions,
         signal: controller.signal,
         headers: {
           ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(maybeToken ? { Authorization: `Bearer ${maybeToken}` } : {}),
           ...headers,
         },
       });
+    };
+
+    try {
+      let response = await doFetch(token || undefined);
+
+      // Si expira y era una ruta protegida, intenta refrescar una sola vez
+      if (response.status === 401 && auth && !endpoint.includes('/auth/refresh')) {
+        const newToken = await this.refreshAccessToken();
+        if (newToken) {
+          // reintento con nuevo token
+          response = await doFetch(newToken);
+        } else {
+          this.clearSession();
+        }
+      }
 
       clearTimeout(timeoutId);
 
@@ -60,6 +132,7 @@ class ApiClient {
     } catch (error) {
       clearTimeout(timeoutId);
       if (error instanceof Error) {
+        // Si fue abortado, re-lanza el mensaje estándar
         throw error;
       }
       throw new Error('Unknown error occurred');
