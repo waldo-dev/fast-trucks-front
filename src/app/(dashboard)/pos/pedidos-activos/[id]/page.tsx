@@ -108,19 +108,19 @@ const formatPaymentLabel = (pay?: string) => {
 };
 
 const mapOrder = (o: any): UiOrderDetail => {
-  const items = Array.isArray(o?.items)
+  const items: UiOrderItem[] = Array.isArray(o?.items)
     ? o.items.map((it: any) => {
-      const qty = Number(it?.quantity) || 0;
-      const unit = Number(it?.unit_price ?? it?.price ?? it?.unitPrice ?? 0);
-      return {
-        id: String(it?.id ?? it?.product_id ?? Math.random().toString(36).slice(2)),
-        name: it?.product?.name || it?.name || 'Producto',
-        quantity: qty,
-        unitPrice: unit,
-        total: qty * unit,
-        notes: it?.notes || it?.comment,
-      } as UiOrderItem;
-    })
+        const qty = Number(it?.quantity) || 0;
+        const unit = Number(it?.unit_price ?? it?.price ?? it?.unitPrice ?? 0);
+        return {
+          id: String(it?.id ?? it?.product_id ?? Math.random().toString(36).slice(2)),
+          name: it?.product?.name || it?.name || 'Producto',
+          quantity: qty,
+          unitPrice: unit,
+          total: qty * unit,
+          notes: it?.notes || it?.comment,
+        } as UiOrderItem;
+      })
     : [];
 
   const itemsCount = items.reduce((acc, it) => acc + (it.quantity || 0), 0);
