@@ -297,7 +297,8 @@ export default function OrdersPage() {
   );
 
   const handleViewDetails = (orderId: string) => {
-    console.log('Ver detalles del pedido:', orderId);
+    if (!orderId) return;
+    router.push(`/pos/pedidos-activos/${encodeURIComponent(orderId)}`);
   };
 
   const handleExport = async () => {
@@ -436,7 +437,16 @@ export default function OrdersPage() {
           {/* Mobile: tarjetas */}
           <div className="md:hidden divide-y divide-[#f0eae4]">
             {paginatedOrders.map((order) => (
-              <div key={order.id} className="px-4 py-3 space-y-2">
+              <div
+                key={order.id}
+                className="px-4 py-3 space-y-2 cursor-pointer active:scale-[0.99] transition"
+                onClick={() => handleViewDetails(order.backendId)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleViewDetails(order.backendId);
+                }}
+                tabIndex={0}
+                role="button"
+              >
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-semibold text-[#181411]">#{order.id}</p>

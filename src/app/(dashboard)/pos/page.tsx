@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { eventService, productService, orderService } from '@/lib/services';
+import { eventService, productService, orderService, cashRegisterService } from '@/lib/services';
 import { config } from '@/lib/config';
 import { toast } from 'react-toastify';
 
@@ -220,6 +220,7 @@ export default function PosPage() {
 
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const isEventOrder = eventMode && !!selectedEvent;
+  const [activeRegisterId, setActiveRegisterId] = useState<string | null>(null);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -373,6 +374,27 @@ const friendlyOrderError = (err: any) => {
         toast.warn('Orden creada pero no se pudo abrir el detalle automáticamente.');
       }
 
+      const totalAmount = cart.reduce(
+        (acc, item) => acc + item.numericPrice * item.quantity,
+        0
+      );
+      if (activeRegisterId && totalAmount > 0) {
+        try {
+          await cashRegisterService.addMovement({
+            cash_register_id: activeRegisterId,
+            type: 'IN',
+            amount: totalAmount,
+            payment_method: paymentMethod,
+            order_id: newId ?? undefined,
+            notes: isEventOrder ? 'POS evento' : 'POS local',
+          } as any);
+        } catch (err) {
+          toast.warn('Orden creada, pero no se registró el movimiento en caja.');
+        }
+      } else if (!activeRegisterId) {
+        toast.info('Orden creada. No se registró en caja porque no hay caja activa.');
+      }
+
       setCart([]);
       setCustomer({ name: '', phone: '', email: '' });
       setDeliveryAddress('');
@@ -522,6 +544,24 @@ const friendlyOrderError = (err: any) => {
     };
 
     loadProducts();
+  }, [selectedBusiness]);
+
+  useEffect(() => {
+    const loadRegister = async () => {
+      if (!selectedBusiness) {
+        setActiveRegisterId(null);
+        return;
+      }
+      try {
+        const resp = await cashRegisterService.getActive({ business_id: selectedBusiness });
+        const payload = (resp as any)?.data ?? resp;
+        setActiveRegisterId(payload?.id ? String(payload.id) : null);
+      } catch {
+        setActiveRegisterId(null);
+      }
+    };
+
+    loadRegister();
   }, [selectedBusiness]);
 
   return (

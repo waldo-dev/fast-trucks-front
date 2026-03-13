@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { eventService } from '@/lib/services';
 import { readOperatingContext } from '@/lib/operatingContext';
 import { getCachedUser } from '@/lib/auth';
@@ -58,10 +59,13 @@ export default function EventsAnalyticsPage() {
   const planTier = (ctx as any)?.planTier || getCachedTier();
   const canSeeReports = hasFeature('reports', planTier);
 
+  const searchParams = useSearchParams();
+  const initialEventId = searchParams?.get('eventId') || '';
+
   const [analytics, setAnalytics] = useState<AnalyticsItem[]>([]);
   const [limit, setLimit] = useState(10);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
-  const [selectedEventId, setSelectedEventId] = useState<string>('');
+  const [selectedEventId, setSelectedEventId] = useState<string>(initialEventId);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -86,7 +90,12 @@ export default function EventsAnalyticsPage() {
           margin_pct: ev.margin_pct !== undefined ? Number(ev.margin_pct) : undefined,
         }));
         setAnalytics(mapped);
-        if (!selectedEventId && mapped.length) setSelectedEventId(mapped[0].id);
+        if (!selectedEventId && mapped.length) {
+          const preferred =
+            (initialEventId && mapped.find((m) => m.id === initialEventId)?.id) ||
+            mapped[0].id;
+          setSelectedEventId(preferred);
+        }
       } else {
         setAnalytics([]);
       }

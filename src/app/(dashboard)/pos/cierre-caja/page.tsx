@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { orderService } from '@/lib/services';
+import { cashRegisterService, orderService } from '@/lib/services';
+import { getCachedUser } from '@/lib/auth';
 import { toast } from 'react-toastify';
 
 type OperatingContext =
@@ -64,6 +65,7 @@ const readOperatingContext = (): OperatingContext => {
 };
 
 export default function PosCierreCajaPage() {
+  const currentUser = getCachedUser();
   const [startDate, setStartDate] = useState<string>(toInputDate(today));
   const [endDate, setEndDate] = useState<string>(toInputDate(today));
   const [vatRate, setVatRate] = useState<number>(0.19);
@@ -71,6 +73,23 @@ export default function PosCierreCajaPage() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<Closeout | null>(null);
   const [operatingContext] = useState<OperatingContext>(() => readOperatingContext());
+  const [activeRegister, setActiveRegister] = useState<any | null>(null);
+  const [movements, setMovements] = useState<any[]>([]);
+  const [loadingRegister, setLoadingRegister] = useState(false);
+  const [openingAmount, setOpeningAmount] = useState<number>(0);
+  const [allowMultiple, setAllowMultiple] = useState(false);
+  const [closingAmount, setClosingAmount] = useState<number>(0);
+  const [movementForm, setMovementForm] = useState<{
+    type: 'IN' | 'OUT';
+    amount: number;
+    payment_method: 'CASH' | 'DEBIT_CARD' | 'CREDIT_CARD' | 'TRANSFER' | 'WEBPAY' | 'OTHER';
+    notes: string;
+  }>({
+    type: 'IN',
+    amount: 0,
+    payment_method: 'CASH',
+    notes: '',
+  });
 
   const loadCloseout = async () => {
     setLoading(true);
@@ -99,8 +118,125 @@ export default function PosCierreCajaPage() {
     }
   };
 
+  const businessId = operatingContext?.business_id || getCachedUser()?.businessId;
+
+  const loadActiveRegister = async () => {
+    if (!businessId) {
+      setActiveRegister(null);
+      setMovements([]);
+      return;
+    }
+    setLoadingRegister(true);
+    setError(null);
+    try {
+      const resp = await cashRegisterService.getActive({ business_id: businessId });
+      const payload = (resp as any)?.data ?? resp;
+      setActiveRegister(payload || null);
+      if (payload?.id) {
+        const movResp = await cashRegisterService.listMovements(payload.id);
+        const movData = (movResp as any)?.data ?? movResp;
+        setMovements(Array.isArray(movData) ? movData : []);
+      } else {
+        setMovements([]);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'No se pudo cargar la caja activa';
+      setError(msg);
+      toast.error(msg);
+      setActiveRegister(null);
+      setMovements([]);
+    } finally {
+      setLoadingRegister(false);
+    }
+  };
+
+  const handleOpenRegister = async () => {
+    if (!businessId) {
+      toast.error('No hay negocio seleccionado para abrir caja.');
+      return;
+    }
+    if (openingAmount < 0) {
+      toast.error('El monto de apertura no puede ser negativo.');
+      return;
+    }
+    setLoadingRegister(true);
+    try {
+      await cashRegisterService.open({
+        business_id: businessId,
+        opening_amount: openingAmount,
+        opened_by: currentUser?.id,
+        allowMultiple,
+      });
+      toast.success('Caja abierta');
+      setOpeningAmount(0);
+      await loadActiveRegister();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'No se pudo abrir la caja';
+      toast.error(msg);
+    } finally {
+      setLoadingRegister(false);
+    }
+  };
+
+  const handleCloseRegister = async () => {
+    if (!activeRegister?.id) return;
+    if (closingAmount < 0) {
+      toast.error('El monto de cierre no puede ser negativo.');
+      return;
+    }
+    setLoadingRegister(true);
+    try {
+      await cashRegisterService.close(activeRegister.id, {
+        closing_amount: closingAmount,
+        closed_by: currentUser?.id,
+      });
+      toast.success('Caja cerrada');
+      setClosingAmount(0);
+      await loadActiveRegister();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'No se pudo cerrar la caja';
+      toast.error(msg);
+    } finally {
+      setLoadingRegister(false);
+    }
+  };
+
+  const handleAddMovement = async () => {
+    if (!activeRegister?.id) {
+      toast.error('No hay caja activa.');
+      return;
+    }
+    if (movementForm.amount <= 0) {
+      toast.error('Ingresa un monto mayor a 0.');
+      return;
+    }
+    setLoadingRegister(true);
+    try {
+      await cashRegisterService.addMovement({
+        cash_register_id: activeRegister.id,
+        type: movementForm.type,
+        amount: movementForm.amount,
+        payment_method: movementForm.payment_method,
+        notes: movementForm.notes || undefined,
+      });
+      toast.success('Movimiento registrado');
+      setMovementForm((prev) => ({ ...prev, amount: 0, notes: '' }));
+      await loadActiveRegister();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'No se pudo registrar el movimiento';
+      toast.error(msg);
+    } finally {
+      setLoadingRegister(false);
+    }
+  };
+
   useEffect(() => {
     loadCloseout();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [operatingContext]);
+
+  useEffect(() => {
+    loadActiveRegister();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [operatingContext]);
 
@@ -119,13 +255,234 @@ export default function PosCierreCajaPage() {
 
   return (
     <div className="flex flex-col gap-5">
+      <div className="bg-white dark:bg-[#2d2419] border border-[#e6e0db] dark:border-[#3d3226] rounded-xl p-4 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a7560]">
+              Caja
+            </p>
+            <h2 className="text-lg font-bold text-[#181411] dark:text-white">Gestión de caja</h2>
+          </div>
+          <div className="text-sm text-gray-600 dark:text-gray-300">
+            {activeRegister
+              ? `Caja activa #${activeRegister.id}`
+              : businessId
+                ? 'Sin caja abierta'
+                : 'Sin negocio seleccionado'}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-[1.1fr,0.9fr] gap-4">
+          <div className="space-y-3">
+            <div className="border border-primary/10 dark:border-[#3d3226] rounded-lg p-3 space-y-3">
+              <h3 className="text-sm font-semibold text-[#181411] dark:text-white">Estado y acciones</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div className="border border-primary/10 dark:border-[#3d3226] rounded-lg p-3 space-y-2">
+                  <div className="text-sm text-[#181411] dark:text-white font-semibold">Caja activa</div>
+                  {loadingRegister ? (
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Cargando...</p>
+                  ) : activeRegister ? (
+                    <div className="space-y-1 text-sm text-[#181411] dark:text-white">
+                      <p>
+                        <span className="font-semibold">ID:</span> {activeRegister.id}
+                      </p>
+                      <p>
+                        <span className="font-semibold">Estado:</span>{' '}
+                        {activeRegister.status || 'OPEN'}
+                      </p>
+                      <p>
+                        <span className="font-semibold">Apertura:</span>{' '}
+                        {formatClp(Number(activeRegister.opening_amount) || 0)}
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-300">
+                        {activeRegister.opened_at || activeRegister.created_at || ''}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      No hay caja abierta. Abre una para registrar movimientos.
+                    </p>
+                  )}
+                </div>
+
+                <div className="border border-primary/10 dark:border-[#3d3226] rounded-lg p-3 space-y-2">
+                  <div className="text-sm font-semibold text-[#181411] dark:text-white">Cerrar caja</div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold text-[#8a7560]">Monto de cierre</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="100"
+                      value={closingAmount}
+                      onChange={(e) => setClosingAmount(Number(e.target.value))}
+                      className="h-10 px-3 rounded-lg border border-primary/20 bg-white dark:bg-[#1f1a13] text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                    />
+                    <button
+                      onClick={handleCloseRegister}
+                      disabled={loadingRegister || !activeRegister}
+                      className="h-10 rounded-lg bg-amber-600 text-white text-sm font-bold hover:bg-amber-500 disabled:opacity-60"
+                    >
+                      {loadingRegister ? 'Procesando...' : 'Cerrar caja'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border border-primary/10 dark:border-[#3d3226] rounded-lg p-3 space-y-2">
+                <div className="text-sm font-semibold text-[#181411] dark:text-white">Abrir caja</div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div className="md:col-span-2 flex flex-col gap-2">
+                    <label className="text-xs font-semibold text-[#8a7560]">Monto de apertura</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="100"
+                      value={openingAmount}
+                      onChange={(e) => setOpeningAmount(Number(e.target.value))}
+                      className="h-10 px-3 rounded-lg border border-primary/20 bg-white dark:bg-[#1f1a13] text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                    />
+                    <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                      <input
+                        type="checkbox"
+                        className="accent-primary"
+                        checked={allowMultiple}
+                        onChange={(e) => setAllowMultiple(e.target.checked)}
+                      />
+                      Permitir múltiples cajas abiertas
+                    </label>
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      onClick={handleOpenRegister}
+                      disabled={loadingRegister || !businessId}
+                      className="w-full h-10 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-60"
+                    >
+                      {loadingRegister ? 'Procesando...' : 'Abrir caja'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="border border-primary/10 dark:border-[#3d3226] rounded-lg p-3 space-y-2">
+              <h3 className="text-sm font-semibold text-[#181411] dark:text-white">Registrar movimiento</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-[#8a7560]">Tipo</label>
+                  <select
+                    value={movementForm.type}
+                    onChange={(e) =>
+                      setMovementForm((prev) => ({
+                        ...prev,
+                        type: e.target.value as 'IN' | 'OUT',
+                      }))
+                    }
+                    className="h-10 px-3 rounded-lg border border-primary/20 bg-white dark:bg-[#1f1a13] text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                  >
+                    <option value="IN">Ingreso</option>
+                    <option value="OUT">Egreso</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-[#8a7560]">Método pago</label>
+                  <select
+                    value={movementForm.payment_method}
+                    onChange={(e) =>
+                      setMovementForm((prev) => ({
+                        ...prev,
+                        payment_method: e.target.value as any,
+                      }))
+                    }
+                    className="h-10 px-3 rounded-lg border border-primary/20 bg-white dark:bg-[#1f1a13] text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                  >
+                    <option value="CASH">Efectivo</option>
+                    <option value="DEBIT_CARD">Débito</option>
+                    <option value="CREDIT_CARD">Crédito</option>
+                    <option value="TRANSFER">Transferencia</option>
+                    <option value="WEBPAY">Webpay</option>
+                    <option value="OTHER">Otro</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-[#8a7560]">Monto</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="100"
+                    value={movementForm.amount}
+                    onChange={(e) =>
+                      setMovementForm((prev) => ({
+                        ...prev,
+                        amount: Number(e.target.value),
+                      }))
+                    }
+                    className="h-10 px-3 rounded-lg border border-primary/20 bg-white dark:bg-[#1f1a13] text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-[#8a7560]">Notas (opcional)</label>
+                  <input
+                    value={movementForm.notes}
+                    onChange={(e) =>
+                      setMovementForm((prev) => ({
+                        ...prev,
+                        notes: e.target.value,
+                      }))
+                    }
+                    className="h-10 px-3 rounded-lg border border-primary/20 bg-white dark:bg-[#1f1a13] text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                    placeholder="Ej: apertura, arqueo, retiro"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={handleAddMovement}
+                disabled={loadingRegister || !activeRegister}
+                className="h-10 rounded-lg bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-500 disabled:opacity-60"
+              >
+                {loadingRegister ? 'Procesando...' : 'Agregar movimiento'}
+              </button>
+            </div>
+
+            <div className="border border-primary/10 dark:border-[#3d3226] rounded-lg p-3 space-y-2">
+              <h3 className="text-sm font-semibold text-[#181411] dark:text-white">Movimientos</h3>
+              {loadingRegister ? (
+                <p className="text-sm text-gray-600 dark:text-gray-300">Cargando...</p>
+              ) : !movements.length ? (
+                <p className="text-sm text-gray-600 dark:text-gray-300">Sin movimientos.</p>
+              ) : (
+                <div className="max-h-64 overflow-y-auto divide-y divide-primary/10">
+                  {movements.map((m) => (
+                    <div
+                      key={m.id || `${m.type}-${m.amount}-${m.created_at}`}
+                      className="py-2 text-sm"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold">
+                          {m.type === 'OUT' ? '-' : '+'} {formatClp(Number(m.amount) || 0)}
+                        </span>
+                        <span className="text-xs text-gray-500">{m.created_at || ''}</span>
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-300">
+                        {m.payment_method || '—'} {m.notes ? `· ${m.notes}` : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-1">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a7560]">
           Terminal Punto de Venta
         </p>
-        <h1 className="text-2xl font-black text-[#181411] dark:text-white">Cierre de Caja</h1>
+        <h1 className="text-2xl font-black text-[#181411] dark:text-white">Gestión de Caja</h1>
         <p className="text-[#8a7560] dark:text-[#a3907d]">
-          Resumen del turno: ventas, impuestos, documentos y medios de pago.
+          Abrir, cerrar y mover caja; además consulta el resumen del turno.
         </p>
       </div>
 

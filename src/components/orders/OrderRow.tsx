@@ -98,7 +98,15 @@ export const OrderRow: React.FC<OrderRowProps> = ({
   const opacityClass = order.isDelivered ? 'opacity-60' : '';
 
   return (
-    <tr className={`${getHoverClass(order.status)} transition-colors group ${opacityClass}`}>
+    <tr
+      className={`${getHoverClass(order.status)} transition-colors group ${opacityClass} cursor-pointer`}
+      onClick={() => onViewDetails(order.backendId)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onViewDetails(order.backendId);
+      }}
+      tabIndex={0}
+      role="button"
+    >
       <td className="px-6 py-4">
         <div className="flex flex-col">
           <span className="text-sm font-bold text-[#181411]">#{order.id}</span>
@@ -139,6 +147,7 @@ export const OrderRow: React.FC<OrderRowProps> = ({
             value={uiToApiStatus(order.status)}
             onChange={(e) => onUpdateStatus(order.backendId, e.target.value)}
             disabled={updating}
+            onClick={(e) => e.stopPropagation()}
           >
             {statusOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -146,12 +155,6 @@ export const OrderRow: React.FC<OrderRowProps> = ({
               </option>
             ))}
           </select>
-          <button
-            onClick={() => onViewDetails(order.id)}
-            className="text-primary text-sm font-bold hover:underline"
-          >
-            Ver Detalles
-          </button>
         </div>
       </td>
     </tr>

@@ -136,7 +136,7 @@ export const OPERATOR_SIDEBAR_ITEMS = [
     icon: 'history',
   },
   {
-    title: 'Cierre de Caja',
+    title: 'Gestión de Caja',
     href: '/pos/cierre-caja',
     icon: 'lock_open',
   },

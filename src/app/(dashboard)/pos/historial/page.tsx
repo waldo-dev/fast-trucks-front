@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { businessService, orderService, eventService, customerService } from '@/lib/services';
 import { readOperatingContext } from '@/lib/operatingContext';
 import { getCachedUser } from '@/lib/auth';
@@ -76,6 +77,7 @@ const todayRangeLocal = () => {
 };
 
 export default function PosHistorialPage() {
+  const router = useRouter();
   const [businesses, setBusinesses] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedBusiness, setSelectedBusiness] = useState<string>(
     () => readOperatingContext()?.business_id ?? ''
@@ -317,6 +319,8 @@ export default function PosHistorialPage() {
 
   const handlePrev = () => setPage((prev) => Math.max(1, prev - 1));
   const handleNext = () => setPage((prev) => Math.min(totalPages, prev + 1));
+  const openOrder = (orderId: string) =>
+    router.push(`/pos/pedidos-activos/${encodeURIComponent(orderId)}`);
 
   return (
     <div className="flex flex-col gap-4">
@@ -494,7 +498,11 @@ export default function PosHistorialPage() {
                 </thead>
                 <tbody className="divide-y divide-primary/10 text-sm text-[#181411]">
                   {paginatedOrders.map((o) => (
-                    <tr key={o.id} className="hover:bg-primary/5">
+                    <tr
+                      key={o.id}
+                      className="hover:bg-primary/5 cursor-pointer"
+                      onClick={() => openOrder(o.id)}
+                    >
                       <td className="px-4 py-3 font-semibold">#{o.code}</td>
                       <td className="px-4 py-3">{o.businessName}</td>
                       <td className="px-4 py-3">
@@ -531,7 +539,11 @@ export default function PosHistorialPage() {
             {/* Mobile: tarjetas */}
             <div className="md:hidden divide-y divide-primary/10">
               {paginatedOrders.map((o) => (
-                <div key={o.id} className="px-4 py-3 space-y-2">
+                <div
+                  key={o.id}
+                  className="px-4 py-3 space-y-2 cursor-pointer active:scale-[0.99] transition"
+                  onClick={() => openOrder(o.id)}
+                >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-semibold text-[#181411]">#{o.code}</p>

@@ -317,6 +317,8 @@ export const orderService = {
     status?: string;
     order_source?: string;
     customer_id?: string | number;
+    business_id?: string | number;
+    event_id?: string | number;
   }) => api.get(`orders${qs(params)}`, { auth: true }),
   history: (params?: {
     start_date?: string;
@@ -325,6 +327,7 @@ export const orderService = {
     order_source?: string;
     customer_id?: string | number;
     business_id?: string | number;
+    event_id?: string | number;
   }) => api.get(`orders/history${qs(params)}`, { auth: true }),
   closeout: (params?: { start_date?: string; end_date?: string; vat_rate?: number }) =>
     api.get(`orders/closeout${qs(params)}`, { auth: true }),
@@ -346,6 +349,32 @@ export const paymentService = {
 export const paymentConfigService = {
   listActive: () => api.get("/payment-configs", { auth: true }),
   create: (data: unknown) => api.post("/payment-configs", data, { auth: true }),
+};
+
+export const cashRegisterService = {
+  open: (data: {
+    business_id: string | number;
+    location_id?: string | number;
+    opened_by?: string | number;
+    opening_amount: number;
+    allowMultiple?: boolean;
+  }) => api.post("cash-registers/open", data, { auth: true }),
+  close: (
+    id: string | number,
+    data: { closing_amount: number; closed_by?: string | number }
+  ) => api.post(`cash-registers/${id}/close`, data, { auth: true }),
+  getActive: (params: { business_id: string | number; location_id?: string | number }) =>
+    api.get(`cash-registers/active${qs(params)}`, { auth: true }),
+  addMovement: (data: {
+    cash_register_id: string | number;
+    type: string;
+    amount: number;
+    payment_method?: string;
+    order_id?: string | number;
+    notes?: string;
+  }) => api.post("cash-registers/movements", data, { auth: true }),
+  listMovements: (id: string | number) =>
+    api.get(`cash-registers/${id}/movements`, { auth: true }),
 };
 
 export const mailingService = {

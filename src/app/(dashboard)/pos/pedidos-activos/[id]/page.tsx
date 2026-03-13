@@ -221,7 +221,13 @@ export default function PedidoDetallePage() {
         <div className="flex items-start gap-3">
           <button
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-primary/20 text-sm font-semibold text-primary hover:bg-primary/5"
-            onClick={() => router.push('/pos/pedidos-activos')}
+            onClick={() => {
+              if (window.history.length > 1) {
+                router.back();
+              } else {
+                router.push('/pos/pedidos-activos');
+              }
+            }}
           >
             <span className="material-symbols-outlined text-base">arrow_back</span>
             Volver
