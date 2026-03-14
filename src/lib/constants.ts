@@ -27,11 +27,6 @@ export const SIDEBAR_ITEMS = [
     icon: 'shopping_bag',
   },
   {
-    title: 'Pagos',
-    href: '/payments',
-    icon: 'payments',
-  },
-  {
     title: 'Clientes',
     href: '/customers',
     icon: 'group',

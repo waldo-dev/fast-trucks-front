@@ -163,7 +163,6 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
       '/customers',
       '/products',
       '/promotions',
-      '/payments',
       '/events',
       '/events/analytics',
       '/outlets',
