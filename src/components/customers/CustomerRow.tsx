@@ -68,7 +68,15 @@ export const CustomerRow: React.FC<CustomerRowProps> = ({
 
   return (
     <>
-      <tr className={rowClass} onClick={() => onToggleExpand(customer.id)}>
+      <tr
+        className={rowClass}
+        onClick={() => onViewProfile(customer.id)}
+        tabIndex={0}
+        role="button"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') onViewProfile(customer.id);
+        }}
+      >
         <td className="px-6 py-4">
           <div className="flex items-center gap-3">
             <div

@@ -7,8 +7,8 @@ interface ProductFiltersProps {
   onCategoryChange: (category: string) => void;
   selectedStatus: string;
   onStatusChange: (status: string) => void;
-  selectedVenue: string;
-  onVenueChange: (venueId: string) => void;
+  selectedVenue?: string;
+  onVenueChange?: (venueId: string) => void;
   venues?: Array<{ id: string; name: string }>;
   categories?: Array<{ id: string; name: string; icon?: string; count?: number }>;
   className?: string;
@@ -27,9 +27,7 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
 }) => {
   const normalizedVenues = venues && venues.length
     ? venues
-    : [
-        { id: '', name: 'Todos los Locales' },
-      ];
+    : [];
 
   const normalizedCategories =
     categories && categories.length
@@ -49,6 +47,7 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
   ];
 
   const handleVenueSelect = (venueId: string) => {
+    if (!onVenueChange) return;
     onVenueChange(venueId);
   };
 
@@ -57,30 +56,32 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
       className={`bg-white p-6 flex flex-col gap-8 overflow-y-auto scrollbar-hide ${className ?? ''}`}
     >
       {/* Venue Filter */}
-      <div>
-        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
-          Por Local
-        </h3>
-        <div className="space-y-3">
-          {normalizedVenues.map((venue) => (
-            <label
-              key={venue.id}
-              className="flex items-center gap-3 cursor-pointer group"
-            >
-              <input
-                checked={selectedVenue === venue.id}
-                className="rounded border-gray-300 text-primary focus:ring-primary size-4"
-                type="radio"
-                name="venue"
-                onChange={() => handleVenueSelect(venue.id)}
-              />
-              <span className="text-sm font-medium text-gray-600 group-hover:text-primary transition-colors">
-                {venue.name}
-              </span>
-            </label>
-          ))}
+      {normalizedVenues.length > 1 && onVenueChange && (
+        <div>
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
+            Por Local
+          </h3>
+          <div className="space-y-3">
+            {normalizedVenues.map((venue) => (
+              <label
+                key={venue.id}
+                className="flex items-center gap-3 cursor-pointer group"
+              >
+                <input
+                  checked={selectedVenue === venue.id}
+                  className="rounded border-gray-300 text-primary focus:ring-primary size-4"
+                  type="radio"
+                  name="venue"
+                  onChange={() => handleVenueSelect(venue.id)}
+                />
+                <span className="text-sm font-medium text-gray-600 group-hover:text-primary transition-colors">
+                  {venue.name}
+                </span>
+              </label>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Categories Filter */}
       <div>

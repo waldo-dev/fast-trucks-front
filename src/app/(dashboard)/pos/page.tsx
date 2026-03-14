@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { eventService, productService, orderService } from '@/lib/services';
+import { eventService, productService, orderService, cashRegisterService } from '@/lib/services';
 import { config } from '@/lib/config';
 import { toast } from 'react-toastify';
 
@@ -220,6 +220,25 @@ export default function PosPage() {
 
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const isEventOrder = eventMode && !!selectedEvent;
+  const [activeRegisterId, setActiveRegisterId] = useState<string | null>(null);
+  const [activeRegister, setActiveRegister] = useState<any | null>(null);
+  const [registerSummary, setRegisterSummary] = useState<any | null>(null);
+  const [registerHistory, setRegisterHistory] = useState<any[]>([]);
+  const [registerLoading, setRegisterLoading] = useState(false);
+  const [openingAmount, setOpeningAmount] = useState<string>('');
+  const [closingAmount, setClosingAmount] = useState<string>('');
+  const [allowMultiple, setAllowMultiple] = useState(false);
+  const [movementForm, setMovementForm] = useState<{
+    type: 'IN' | 'OUT';
+    amount: number;
+    payment_method: 'CASH' | 'DEBIT_CARD' | 'CREDIT_CARD' | 'TRANSFER' | 'WEBPAY' | 'OTHER';
+    notes: string;
+  }>({
+    type: 'IN',
+    amount: 0,
+    payment_method: 'CASH',
+    notes: '',
+  });
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -244,6 +263,21 @@ export default function PosPage() {
       currency: 'CLP',
       maximumFractionDigits: 0,
     }).format(value || 0);
+
+  const formatRegisterStatus = (status?: string) => {
+    const normalized = (status || '').toString().toUpperCase();
+    switch (normalized) {
+      case 'OPEN':
+      case 'OPENED':
+        return 'Abierta';
+      case 'CLOSED':
+        return 'Cerrada';
+      case 'PENDING':
+        return 'Pendiente';
+      default:
+        return status || 'Abierta';
+    }
+  };
 
   const resolveImageUrl = (url?: string | null) => {
     const fallback =
@@ -296,6 +330,112 @@ const friendlyOrderError = (err: any) => {
       ];
     });
   }, []);
+
+  const handleOpenRegister = async () => {
+    if (!selectedBusiness) {
+      toast.error('Selecciona un local para abrir caja.');
+      return;
+    }
+    const openingNumeric = Number(openingAmount || 0);
+    if (openingNumeric < 0) {
+      toast.error('El monto de apertura no puede ser negativo.');
+      return;
+    }
+    setRegisterLoading(true);
+    try {
+      await cashRegisterService.open({
+        business_id: selectedBusiness,
+        opening_amount: openingNumeric,
+        allowMultiple,
+      });
+      toast.success('Caja abierta');
+      setOpeningAmount('');
+      const resp = await cashRegisterService.getActive({ business_id: selectedBusiness });
+      const payload = (resp as any)?.data ?? resp;
+      setActiveRegister(payload || null);
+      setActiveRegisterId(payload?.id ? String(payload.id) : null);
+      const hist = await cashRegisterService.history({ business_id: selectedBusiness });
+      const histData = (hist as any)?.data ?? hist;
+      setRegisterHistory(Array.isArray(histData) ? histData : []);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'No se pudo abrir la caja';
+      toast.error(msg);
+    } finally {
+      setRegisterLoading(false);
+    }
+  };
+
+  const handleAddMovement = async () => {
+    if (!activeRegisterId) {
+      toast.error('No hay caja activa.');
+      return;
+    }
+    if (movementForm.amount <= 0) {
+      toast.error('Ingresa un monto mayor a 0.');
+      return;
+    }
+    setRegisterLoading(true);
+    try {
+      await cashRegisterService.addMovement(activeRegisterId, {
+        type: movementForm.type,
+        amount: movementForm.amount,
+        payment_method: movementForm.payment_method,
+        notes: movementForm.notes || undefined,
+      });
+      toast.success('Movimiento registrado');
+      setMovementForm((prev) => ({ ...prev, amount: 0, notes: '' }));
+      const hist = await cashRegisterService.history({ business_id: selectedBusiness });
+      const histData = (hist as any)?.data ?? hist;
+      setRegisterHistory(Array.isArray(histData) ? histData : []);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo registrar el movimiento');
+    } finally {
+      setRegisterLoading(false);
+    }
+  };
+
+  const handleLoadSummary = async () => {
+    if (!activeRegisterId) return;
+    setRegisterLoading(true);
+    try {
+      const resp = await cashRegisterService.summary(activeRegisterId);
+      const data = (resp as any)?.data ?? resp;
+      setRegisterSummary(data || null);
+    } catch {
+      setRegisterSummary(null);
+      toast.error('No se pudo cargar el resumen de caja');
+    } finally {
+      setRegisterLoading(false);
+    }
+  };
+
+  const handleCloseRegister = async () => {
+    if (!activeRegisterId) return;
+    const closingNumeric = Number(closingAmount || 0);
+    if (closingNumeric < 0) {
+      toast.error('El monto de cierre no puede ser negativo.');
+      return;
+    }
+    await handleLoadSummary();
+    setRegisterLoading(true);
+    try {
+      await cashRegisterService.close(activeRegisterId, {
+        closing_amount: closingNumeric,
+      });
+      toast.success('Caja cerrada');
+      setClosingAmount('');
+      setActiveRegister(null);
+      setActiveRegisterId(null);
+      setRegisterSummary(null);
+      const hist = await cashRegisterService.history({ business_id: selectedBusiness });
+      const histData = (hist as any)?.data ?? hist;
+      setRegisterHistory(Array.isArray(histData) ? histData : []);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo cerrar la caja');
+    } finally {
+      setRegisterLoading(false);
+    }
+  };
 
   const handleCreateOrder = async () => {
     setError(null);
@@ -371,6 +511,26 @@ const friendlyOrderError = (err: any) => {
         router.push(`/pos/pedidos-activos/${encodeURIComponent(String(newId))}`);
       } else {
         toast.warn('Orden creada pero no se pudo abrir el detalle automáticamente.');
+      }
+
+      const totalAmount = cart.reduce(
+        (acc, item) => acc + item.numericPrice * item.quantity,
+        0
+      );
+      if (activeRegisterId && totalAmount > 0) {
+        try {
+          await cashRegisterService.addMovement(activeRegisterId, {
+            type: 'IN',
+            amount: totalAmount,
+            payment_method: paymentMethod,
+            order_id: newId ?? undefined,
+            notes: isEventOrder ? 'POS evento' : 'POS local',
+          } as any);
+        } catch (err) {
+          toast.warn('Orden creada, pero no se registró el movimiento en caja.');
+        }
+      } else if (!activeRegisterId) {
+        toast.info('Orden creada. No se registró en caja porque no hay caja activa.');
       }
 
       setCart([]);
@@ -524,6 +684,43 @@ const friendlyOrderError = (err: any) => {
     loadProducts();
   }, [selectedBusiness]);
 
+  useEffect(() => {
+    const loadRegister = async () => {
+      if (!selectedBusiness) {
+        setActiveRegisterId(null);
+        setActiveRegister(null);
+        setRegisterSummary(null);
+        return;
+      }
+      setRegisterLoading(true);
+      try {
+        const resp = await cashRegisterService.getActive({ business_id: selectedBusiness });
+        const payload = (resp as any)?.data ?? resp;
+        if (payload?.id) {
+          setActiveRegisterId(String(payload.id));
+          setActiveRegister(payload);
+        } else {
+          setActiveRegisterId(null);
+          setActiveRegister(null);
+        }
+        try {
+          const hist = await cashRegisterService.history({ business_id: selectedBusiness });
+          const histData = (hist as any)?.data ?? hist;
+          setRegisterHistory(Array.isArray(histData) ? histData : []);
+        } catch {
+          setRegisterHistory([]);
+        }
+      } catch {
+        setActiveRegisterId(null);
+        setActiveRegister(null);
+      } finally {
+        setRegisterLoading(false);
+      }
+    };
+
+    loadRegister();
+  }, [selectedBusiness]);
+
   return (
     <div className="flex flex-col gap-4 lg:gap-6">
       {/* Encabezado */}
@@ -602,6 +799,197 @@ const friendlyOrderError = (err: any) => {
           </button>
         </div>
       </header>
+
+      {/* Caja en POS */}
+      <div className="bg-white border border-primary/10 rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary">point_of_sale</span>
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-primary font-semibold">
+                Caja en POS
+              </p>
+              <h3 className="text-lg font-bold text-[#181411]">
+                {activeRegister ? `Caja #${activeRegisterId}` : 'Sin caja abierta'}
+              </h3>
+            </div>
+          </div>
+          {registerLoading && <span className="text-xs text-gray-500">Cargando...</span>}
+        </div>
+
+        {!activeRegister ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="md:col-span-2 flex flex-col gap-2">
+              <label className="text-xs font-semibold text-[#8a7560]">Monto de apertura</label>
+              <input
+                type="number"
+                min={0}
+                step="100"
+                value={openingAmount}
+                onChange={(e) => setOpeningAmount(e.target.value)}
+                className="h-11 px-3 rounded-lg border border-primary/20 bg-background-light text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+              />
+              <label className="inline-flex items-center gap-2 text-xs text-gray-600">
+                <input
+                  type="checkbox"
+                  className="accent-primary"
+                  checked={allowMultiple}
+                  onChange={(e) => setAllowMultiple(e.target.checked)}
+                />
+                Permitir múltiples cajas abiertas
+              </label>
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={handleOpenRegister}
+                disabled={registerLoading || !selectedBusiness}
+                className="w-full h-11 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-60"
+              >
+                Abrir caja
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-3">
+            <div className="border border-primary/10 rounded-lg p-3 space-y-1">
+              <p className="text-xs text-[#8a7560] font-semibold">Estado</p>
+              <p className="text-sm font-bold text-[#181411]">
+                {formatRegisterStatus(activeRegister?.status || 'OPEN')}
+              </p>
+              <p className="text-xs text-gray-500">
+                Apertura: {formatClp(Number(activeRegister?.opening_amount) || 0)}
+              </p>
+            </div>
+            <div className="border border-primary/10 rounded-lg p-3 space-y-2 xl:col-span-2">
+              <p className="text-xs text-[#8a7560] font-semibold">Registrar movimiento</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="flex items-center gap-2">
+                  <select
+                    value={movementForm.type}
+                    onChange={(e) =>
+                      setMovementForm((prev) => ({ ...prev, type: e.target.value as 'IN' | 'OUT' }))
+                    }
+                    className="h-10 px-3 rounded-lg border border-primary/20 text-sm w-28"
+                  >
+                    <option value="IN">Ingreso</option>
+                    <option value="OUT">Egreso</option>
+                  </select>
+                  <input
+                    type="number"
+                    min={0}
+                    step="100"
+                    value={movementForm.amount}
+                    onChange={(e) =>
+                      setMovementForm((prev) => ({ ...prev, amount: Number(e.target.value) }))
+                    }
+                    className="h-10 px-3 rounded-lg border border-primary/20 text-sm flex-1"
+                    placeholder="Monto"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={movementForm.payment_method}
+                    onChange={(e) =>
+                      setMovementForm((prev) => ({
+                        ...prev,
+                        payment_method: e.target.value as any,
+                      }))
+                    }
+                    className="h-10 px-3 rounded-lg border border-primary/20 text-sm flex-1"
+                  >
+                    <option value="CASH">Efectivo</option>
+                    <option value="DEBIT_CARD">Débito</option>
+                    <option value="CREDIT_CARD">Crédito</option>
+                    <option value="TRANSFER">Transferencia</option>
+                    <option value="WEBPAY">Webpay</option>
+                    <option value="OTHER">Otro</option>
+                  </select>
+                  <input
+                    value={movementForm.notes}
+                    onChange={(e) =>
+                      setMovementForm((prev) => ({ ...prev, notes: e.target.value }))
+                    }
+                    className="h-10 px-3 rounded-lg border border-primary/20 text-sm flex-1"
+                    placeholder="Notas (opcional)"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAddMovement}
+                  disabled={registerLoading}
+                  className="h-10 px-4 rounded-lg bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-500 disabled:opacity-60"
+                >
+                  Agregar movimiento
+                </button>
+                <button
+                  onClick={handleLoadSummary}
+                  disabled={registerLoading}
+                  className="h-10 px-4 rounded-lg border border-primary/20 text-sm font-semibold text-primary hover:bg-primary/5"
+                >
+                  Ver resumen
+                </button>
+              </div>
+            </div>
+            <div className="border border-primary/10 rounded-lg p-3 space-y-2">
+              <p className="text-xs text-[#8a7560] font-semibold">Cerrar caja</p>
+              <input
+                type="number"
+                min={0}
+                step="100"
+                value={closingAmount}
+                onChange={(e) => setClosingAmount(e.target.value)}
+                className="h-10 px-3 rounded-lg border border-primary/20 text-sm w-full"
+                placeholder="Monto de cierre"
+              />
+              <button
+                onClick={handleCloseRegister}
+                disabled={registerLoading}
+                className="h-10 w-full rounded-lg bg-amber-600 text-white text-sm font-bold hover:bg-amber-500 disabled:opacity-60"
+              >
+                Cerrar caja
+              </button>
+            </div>
+          </div>
+        )}
+
+        {registerSummary && activeRegister && (
+          <div className="bg-primary/5 border border-primary/10 rounded-lg p-3 text-sm text-[#181411] space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold">Resumen caja #{activeRegisterId}</span>
+              <button
+                className="text-xs text-primary font-semibold"
+                onClick={() => setRegisterSummary(null)}
+              >
+                Ocultar
+              </button>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              <div>Ingresos: {formatClp(Number(registerSummary?.total_in) || 0)}</div>
+              <div>Egresos: {formatClp(Number(registerSummary?.total_out) || 0)}</div>
+              <div>Saldo: {formatClp(Number(registerSummary?.balance) || 0)}</div>
+              {registerSummary?.payments &&
+                Object.entries(registerSummary.payments).map(([k, v]) => (
+                  <div key={k}>
+                    {k}: {formatClp(Number(v) || 0)}
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {registerHistory.length > 0 && (
+          <div className="text-xs text-[#8a7560]">
+            Historial reciente:{' '}
+            <span className="text-[#181411] font-semibold">
+              {registerHistory
+                .slice(0, 3)
+                .map((r: any) => `#${r.id || r.code || r.external_id || r.order_id || ''}`)
+                .join(' · ')}
+            </span>
+          </div>
+        )}
+      </div>
 
       {/* Datos del cliente (mobile primero) */}
       <div className="md:hidden bg-white border border-primary/10 rounded-xl p-4 shadow-sm">

@@ -8,6 +8,7 @@ interface MetricCardProps {
   changeType: 'positive' | 'negative';
   borderColor: 'emerald' | 'orange' | 'blue' | 'rose';
   iconBgColor: 'emerald' | 'orange' | 'blue' | 'rose';
+  compact?: boolean;
 }
 
 export const MetricCard: React.FC<MetricCardProps> = ({
@@ -18,6 +19,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   changeType,
   borderColor,
   iconBgColor,
+  compact = false,
 }) => {
   const borderColors = {
     emerald: 'border-emerald-500',
@@ -52,18 +54,26 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     }
   };
 
+  const hasChange = change?.trim().length > 0;
+
   return (
-    <div className={`bg-white dark:bg-[#2d2419] p-6 rounded-xl shadow-sm border-l-4 ${borderColors[borderColor]}`}>
-      <div className="flex justify-between items-start mb-4">
-        <div className={`p-2 rounded-lg ${iconBgColors[iconBgColor]}`}>
+    <div
+      className={`bg-white dark:bg-[#2d2419] ${compact ? 'p-4' : 'p-6'} rounded-xl shadow-sm border-l-4 ${borderColors[borderColor]}`}
+    >
+      <div className={`flex justify-between items-start ${compact ? 'mb-2' : 'mb-4'}`}>
+        <div className={`${compact ? 'p-1.5' : 'p-2'} rounded-lg ${iconBgColors[iconBgColor]}`}>
           <span className="material-symbols-outlined">{icon}</span>
         </div>
+        {hasChange && (
         <span className={`${getChangeColor()} text-xs font-bold px-2 py-1 rounded-full`}>
           {change}
         </span>
+        )}
       </div>
-      <p className="text-[#8a7560] text-sm font-medium mb-1">{label}</p>
-      <h3 className="text-2xl font-bold dark:text-white">{value}</h3>
+      <p className={`text-[#8a7560] ${compact ? 'text-xs' : 'text-sm'} font-medium mb-1`}>
+        {label}
+      </p>
+      <h3 className={`${compact ? 'text-xl' : 'text-2xl'} font-bold dark:text-white`}>{value}</h3>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { eventService, productService } from '@/lib/services';
 import { getCachedUser } from '@/lib/auth';
 import { readOperatingContext } from '@/lib/operatingContext';
@@ -102,11 +103,12 @@ const formatDateTime = (iso?: string) => {
 };
 
 export default function EventsPage() {
+  const router = useRouter();
   const [events, setEvents] = useState<UiEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [futureOnly, setFutureOnly] = useState(true);
+  const [futureOnly, setFutureOnly] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [creating, setCreating] = useState(false);
   const [newEvent, setNewEvent] = useState({
@@ -465,7 +467,13 @@ export default function EventsPage() {
                 </thead>
                 <tbody className="divide-y divide-primary/10 text-sm text-[#181411]">
                   {paginatedEvents.map((ev) => (
-                    <tr key={ev.id} className="hover:bg-primary/5">
+                    <tr
+                      key={ev.id}
+                      className="hover:bg-primary/5 cursor-pointer"
+                      onClick={() =>
+                        router.push(`/events/analytics?eventId=${encodeURIComponent(ev.id)}`)
+                      }
+                    >
                       <td className="px-4 py-3">
                         <div className="flex flex-col">
                           <span className="font-bold">{ev.name}</span>
@@ -516,7 +524,13 @@ export default function EventsPage() {
             {/* Mobile: tarjetas */}
             <div className="md:hidden divide-y divide-primary/10 bg-white dark:bg-[#2d2419] border border-[#e6e0db] dark:border-[#3d3226] rounded-xl">
               {paginatedEvents.map((ev) => (
-                <div key={ev.id} className="px-4 py-3 space-y-2">
+                <div
+                  key={ev.id}
+                  className="px-4 py-3 space-y-2 cursor-pointer active:scale-[0.99] transition"
+                  onClick={() =>
+                    router.push(`/events/analytics?eventId=${encodeURIComponent(ev.id)}`)
+                  }
+                >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-bold text-[#181411]">{ev.name}</p>

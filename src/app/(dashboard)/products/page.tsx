@@ -26,8 +26,6 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [newCategory, setNewCategory] = useState('');
-  const [venues, setVenues] = useState<Array<{ id: string; name: string }>>([]);
-  const [selectedVenue, setSelectedVenue] = useState<string>('');
   const [categories, setCategories] = useState<
     Array<{ id: string; name: string; icon?: string; count?: number }>
   >([]);
@@ -75,6 +73,10 @@ export default function ProductsPage() {
   const [exporting, setExporting] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 10;
+  const ctxBusinessId = useMemo(() => {
+    const ctx = readOperatingContext();
+    return ctx?.type === 'business' && ctx.business_id ? String(ctx.business_id) : undefined;
+  }, []);
 
   const loadCategories = async () => {
     try {
@@ -165,7 +167,7 @@ export default function ProductsPage() {
     setImportError(null);
     setImportSummary(null);
     const params = {
-      business_id: selectedVenue || undefined,
+      business_id: ctxBusinessId || undefined,
     };
     try {
       const resp: any = await toast.promise(
@@ -197,7 +199,7 @@ export default function ProductsPage() {
   const handleExport = async () => {
     setExporting(true);
     const params = {
-      business_id: selectedVenue || undefined,
+      business_id: ctxBusinessId || undefined,
       category_id: selectedCategory || undefined,
       status: selectedStatus || undefined,
     };
@@ -224,33 +226,6 @@ export default function ProductsPage() {
   };
 
   useEffect(() => {
-    const loadVenues = async () => {
-      try {
-        const resp = await businessService.list();
-        const list = (resp as any)?.data ?? resp;
-        const mapped =
-          Array.isArray(list) && list.length
-            ? [{ id: '', name: 'Todos los Locales' }].concat(
-                list.map((biz: any) => ({
-                  id: String(biz.id),
-                  name: biz.name || biz.brand_name || 'Sin nombre',
-                }))
-              )
-            : [{ id: '', name: 'Todos los Locales' }];
-        setVenues(mapped);
-        const selectable = mapped.filter((v) => v.id !== '');
-        if (selectable.length === 1) {
-          setCategoryVenues([selectable[0].id]);
-        }
-      } catch {
-        setVenues([{ id: '', name: 'Todos los Locales' }]);
-        setProductVenues([]);
-      }
-    };
-    loadVenues();
-  }, []);
-
-  useEffect(() => {
     loadCategories();
   }, []);
 
@@ -260,7 +235,7 @@ export default function ProductsPage() {
       const ctx = readOperatingContext();
       const ctxBusinessId = ctx?.type === 'business' ? ctx.business_id : undefined;
       const resp = await productService.listByOwner({
-        business_id: selectedVenue || ctxBusinessId || undefined,
+        business_id: ctxBusinessId || undefined,
         category_id: selectedCategory || undefined,
         status: selectedStatus || undefined,
       });
@@ -318,16 +293,12 @@ export default function ProductsPage() {
   };
 
   useEffect(() => {
-    const ctx = readOperatingContext();
-    if (!selectedVenue && ctx?.type === 'business' && ctx.business_id) {
-      setSelectedVenue(String(ctx.business_id));
-    }
     loadProducts();
-  }, [selectedVenue, selectedCategory, selectedStatus]);
+  }, [selectedCategory, selectedStatus]);
 
   useEffect(() => {
     setPage(1);
-  }, [selectedVenue, selectedCategory, selectedStatus, searchTerm, products]);
+  }, [selectedCategory, selectedStatus, searchTerm, products]);
 
   const displayedProducts = products.filter((p) => {
     if (!searchTerm.trim()) return true;
@@ -378,12 +349,8 @@ export default function ProductsPage() {
   };
 
   const resolveBusinessId = () => {
-    return (
-      selectedVenue ||
-      categoryVenues[0] ||
-      venues.find((v) => v.id !== '')?.id ||
-      ''
-    );
+    if (ctxBusinessId) return ctxBusinessId;
+    return categoryVenues[0] || '';
   };
 
   const handleToggleStatus = async (
@@ -392,7 +359,7 @@ export default function ProductsPage() {
     businessId?: string
   ) => {
     const targetStatus = currentStatus === 'inactive' ? 'ACTIVE' : 'INACTIVE';
-    const businessParam = selectedVenue || businessId;
+    const businessParam = businessId;
     if (targetStatus === 'INACTIVE' && !businessParam) {
       toast.error('Selecciona un local para eliminar el producto.');
       return;
@@ -912,11 +879,7 @@ export default function ProductsPage() {
                   options: '',
                   image: null,
                 });
-                setProductVenues(
-                  venues.filter((v) => v.id !== '').length === 1
-                    ? [venues.find((v) => v.id !== '')?.id || '']
-                    : []
-                );
+                setProductVenues([]);
                 setEditingProductId(null);
                 setProductLoading(false);
               }}
@@ -1143,7 +1106,7 @@ export default function ProductsPage() {
           onClick={() => setFiltersOpen(false)}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-md max-h-[85vh] overflow-hidden relative"
+            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-sm max-h-[70vh] overflow-hidden relative"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -1158,11 +1121,8 @@ export default function ProductsPage() {
               onCategoryChange={setSelectedCategory}
               selectedStatus={selectedStatus}
               onStatusChange={setSelectedStatus}
-              selectedVenue={selectedVenue}
-              onVenueChange={setSelectedVenue}
-              venues={venues}
               categories={categories}
-              className="w-full h-[80vh] max-h-[80vh] border-0"
+              className="w-full max-h-[70vh] border-0"
             />
           </div>
         </div>

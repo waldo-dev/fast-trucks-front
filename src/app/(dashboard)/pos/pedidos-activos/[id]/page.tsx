@@ -110,17 +110,17 @@ const formatPaymentLabel = (pay?: string) => {
 const mapOrder = (o: any): UiOrderDetail => {
   const items: UiOrderItem[] = Array.isArray(o?.items)
     ? o.items.map((it: any) => {
-        const qty = Number(it?.quantity) || 0;
-        const unit = Number(it?.unit_price ?? it?.price ?? it?.unitPrice ?? 0);
-        return {
-          id: String(it?.id ?? it?.product_id ?? Math.random().toString(36).slice(2)),
-          name: it?.product?.name || it?.name || 'Producto',
-          quantity: qty,
-          unitPrice: unit,
-          total: qty * unit,
-          notes: it?.notes || it?.comment,
-        } as UiOrderItem;
-      })
+      const qty = Number(it?.quantity) || 0;
+      const unit = Number(it?.unit_price ?? it?.price ?? it?.unitPrice ?? 0);
+      return {
+        id: String(it?.id ?? it?.product_id ?? Math.random().toString(36).slice(2)),
+        name: it?.product?.name || it?.name || 'Producto',
+        quantity: qty,
+        unitPrice: unit,
+        total: qty * unit,
+        notes: it?.notes || it?.comment,
+      } as UiOrderItem;
+    })
     : [];
 
   const itemsCount = items.reduce((acc, it) => acc + (it.quantity || 0), 0);
@@ -221,7 +221,13 @@ export default function PedidoDetallePage() {
         <div className="flex items-start gap-3">
           <button
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-primary/20 text-sm font-semibold text-primary hover:bg-primary/5"
-            onClick={() => router.push('/pos/pedidos-activos')}
+            onClick={() => {
+              if (window.history.length > 1) {
+                router.back();
+              } else {
+                router.push('/pos/pedidos-activos');
+              }
+            }}
           >
             <span className="material-symbols-outlined text-base">arrow_back</span>
             Volver

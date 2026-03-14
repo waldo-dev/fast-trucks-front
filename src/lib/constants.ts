@@ -27,11 +27,6 @@ export const SIDEBAR_ITEMS = [
     icon: 'shopping_bag',
   },
   {
-    title: 'Pagos',
-    href: '/payments',
-    icon: 'payments',
-  },
-  {
     title: 'Clientes',
     href: '/customers',
     icon: 'group',
@@ -136,7 +131,7 @@ export const OPERATOR_SIDEBAR_ITEMS = [
     icon: 'history',
   },
   {
-    title: 'Cierre de Caja',
+    title: 'Gestión de Caja',
     href: '/pos/cierre-caja',
     icon: 'lock_open',
   },

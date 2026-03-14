@@ -12,7 +12,8 @@ type OrderStatus =
   | string;
 
 interface Order {
-  id: string;
+  id: string; // label to show (e.g. #1234)
+  rawId?: string; // id used for navigation
   venue: string;
   customer: string;
   amount: string;
@@ -45,6 +46,10 @@ const statusMeta = (status: OrderStatus) => {
 export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ orders }) => {
   const pageSize = 5;
   const [page, setPage] = useState(1);
+  const handleNavigate = (rawId?: string) => {
+    if (!rawId) return;
+    window.location.href = `/pos/pedidos-activos/${encodeURIComponent(rawId)}`;
+  };
 
   const totalPages = Math.max(1, Math.ceil(orders.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -90,10 +95,16 @@ export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ orders }) 
           <tbody className="divide-y divide-[#f5f2f0]">
             {paginatedOrders.map((order) => {
               const meta = statusMeta(order.status);
+              const clickable = !!order.rawId;
               return (
                 <tr
                   key={order.id}
-                  className="hover:bg-background-light dark:hover:bg-[#3d3226] transition-colors"
+                  className={`hover:bg-background-light dark:hover:bg-[#3d3226] transition-colors ${clickable ? 'cursor-pointer' : ''}`}
+                  onClick={() => handleNavigate(order.rawId)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleNavigate(order.rawId);
+                  }}
+                  tabIndex={clickable ? 0 : -1}
                 >
                   <td className="px-6 py-4 text-sm font-semibold text-primary">{order.id}</td>
                   <td className="px-6 py-4 text-sm text-[#4b5563] dark:text-[#a3907d]">
@@ -119,8 +130,17 @@ export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ orders }) 
       <div className="md:hidden divide-y divide-[#f5f2f0]">
         {paginatedOrders.map((order) => {
           const meta = statusMeta(order.status);
+          const clickable = !!order.rawId;
           return (
-            <div key={order.id} className="px-6 py-4">
+            <div
+              key={order.id}
+              className={`px-6 py-4 ${clickable ? 'cursor-pointer active:scale-[0.99]' : ''}`}
+              onClick={() => handleNavigate(order.rawId)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleNavigate(order.rawId);
+              }}
+              tabIndex={clickable ? 0 : -1}
+            >
               <div className="flex justify-between items-center mb-2">
                 <div className="text-sm font-semibold text-primary">{order.id}</div>
                 <span className={`px-3 py-1 text-xs font-bold rounded-full ${meta.className}`}>

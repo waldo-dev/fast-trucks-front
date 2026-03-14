@@ -1,9 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { CustomerStats } from '@/components/customers/CustomerStats';
 import { CustomerTable } from '@/components/customers/CustomerTable';
 import { businessService, customerService } from '@/lib/services';
+import { readOperatingContext } from '@/lib/operatingContext';
+import { orderService } from '@/lib/services';
 import { getAccessToken, getCachedUser } from '@/lib/auth';
 import { toast } from 'react-toastify';
 import { config } from '@/lib/config';
@@ -28,6 +31,7 @@ const sanitizePhone = (phone?: string) => {
 };
 
 export default function CustomersPage() {
+  const router = useRouter();
   const [expandedCustomer, setExpandedCustomer] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [customers, setCustomers] = useState<UiCustomer[]>([]);
@@ -47,6 +51,7 @@ export default function CustomersPage() {
   });
   const [page, setPage] = useState(1);
   const pageSize = 10;
+  const [customerOrders, setCustomerOrders] = useState<Record<number, any[]>>({});
 
   const initialsFromName = (name?: string) => {
     if (!name) return 'NN';
@@ -159,6 +164,30 @@ export default function CustomersPage() {
     }
   }, []);
 
+  const fetchCustomerOrders = useCallback(
+    async (customerId: number) => {
+      const ctx = readOperatingContext();
+      const businessId =
+        (ctx?.type === 'business' && ctx.business_id) || getCachedUser()?.businessId;
+      try {
+        const resp = await orderService.list({
+          customer_id: customerId,
+          business_id: businessId,
+        });
+        const data = (resp as any)?.data ?? resp;
+        if (!Array.isArray(data)) return;
+        setCustomerOrders((prev) => ({ ...prev, [customerId]: data }));
+      } catch (err) {
+        toast.error(
+          err instanceof Error
+            ? 'No se pudo cargar el historial del cliente'
+            : 'Error al cargar pedidos del cliente'
+        );
+      }
+    },
+    []
+  );
+
   const fetchBusinessNames = useCallback(async () => {
     try {
       const resp = await businessService.list();
@@ -234,11 +263,13 @@ export default function CustomersPage() {
 
   const handleToggleExpand = (id: number) => {
     setExpandedCustomer(expandedCustomer === id ? null : id);
+    if (!customerOrders[id]) {
+      fetchCustomerOrders(id);
+    }
   };
 
   const handleViewProfile = (id: number) => {
-    // Placeholder: sin acción real
-    console.log('Ver perfil completo:', id);
+    router.push(`/customers/${encodeURIComponent(String(id))}`);
   };
 
   const handleExport = async () => {
@@ -327,9 +358,24 @@ export default function CustomersPage() {
   };
 
   // Agregar isExpanded a cada cliente
+  const mapOrderCard = (order: any, idx: number) => {
+    const total = order.total ?? order.amount ?? 0;
+    return {
+      id: String(order.id ?? order.code ?? order.external_id ?? idx + 1),
+      items: order.items?.[0]?.name || order.source || 'Pedido',
+      total: new Intl.NumberFormat('es-CL', {
+        style: 'currency',
+        currency: 'CLP',
+        maximumFractionDigits: 0,
+      }).format(Number(total) || 0),
+      time: formatDateLabel(order.created_at || order.createdAt),
+    };
+  };
+
   const customersWithExpanded = customers.map((customer) => ({
     ...customer,
     isExpanded: expandedCustomer === customer.id,
+    recentOrders: customerOrders[customer.id]?.slice(0, 5).map(mapOrderCard),
   }));
 
   const totalPages = Math.max(1, Math.ceil(customersWithExpanded.length / pageSize));
