@@ -6,6 +6,25 @@ import { toast } from 'react-toastify';
 import { getCachedUser } from '@/lib/auth';
 import { OWNER_ROLES } from '@/lib/constants';
 
+const friendlyUserError = (err: any, fallback: string) => {
+  const msg =
+    (err?.response?.data as any)?.message ||
+    (err?.response?.data as any)?.error ||
+    err?.message ||
+    err;
+  if (typeof msg === 'string') {
+    const lower = msg.toLowerCase();
+    if (
+      lower.includes('email') &&
+      (lower.includes('exists') || lower.includes('registrado') || lower.includes('duplicate'))
+    ) {
+      return 'El correo ya está registrado. Usa otro correo.';
+    }
+    return msg;
+  }
+  return fallback;
+};
+
 type NormalizedUser = {
   id: string;
   name: string;
@@ -410,7 +429,7 @@ export const UsersView = ({ scope }: UsersViewProps) => {
                   name: '',
                   email: '',
                   password: '',
-                  role: scope === 'admin' ? 'ADMIN' : 'BUSINESS_OWNER',
+                  role: 'LOCAL_OPERATOR',
                   active: true,
                   businessIds:
                     scope === 'owner' && (selectedBusiness || cachedBusinessId)
@@ -746,9 +765,9 @@ export const UsersView = ({ scope }: UsersViewProps) => {
                   });
                   setReloadKey((n) => n + 1);
                 } catch (err) {
-                  setModalError(
-                    err instanceof Error ? err.message : 'No se pudo guardar el usuario'
-                  );
+                  const msg = friendlyUserError(err, 'No se pudo guardar el usuario');
+                  setModalError(msg);
+                  toast.error(msg);
                 } finally {
                   setModalSaving(false);
                 }
@@ -801,7 +820,7 @@ export const UsersView = ({ scope }: UsersViewProps) => {
                   onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
                 >
                   {cachedRole === 'ADMIN' && <option value="ADMIN">Admin</option>}
-                  <option value="BUSINESS_OWNER">Dueño de negocio</option>
+                  {cachedRole === 'ADMIN' && <option value="BUSINESS_OWNER">Dueño de negocio</option>}
                   <option value="LOCAL_OPERATOR">Operador de local</option>
                 </select>
               </div>

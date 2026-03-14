@@ -47,6 +47,7 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
   ];
 
   const handleVenueSelect = (venueId: string) => {
+    if (!onVenueChange) return;
     onVenueChange(venueId);
   };
 

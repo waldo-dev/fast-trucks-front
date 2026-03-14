@@ -292,7 +292,7 @@ export default function DashboardHomePage() {
                 <p className="text-sm text-gray-500">Vista general de todos los locales.</p>
               </div>
             </div>
-            <RecentOrdersTable orders={mappedRecentOrders} />
+        <RecentOrdersTable orders={mappedRecentOrders} />
           </div>*/}
         </div>
 
@@ -300,7 +300,7 @@ export default function DashboardHomePage() {
           <div className="bg-white border border-primary/10 rounded-xl p-4 shadow-sm">
             <h2 className="text-lg font-bold text-[#181411] mb-1">Top locales</h2>
             <p className="text-sm text-gray-500 mb-3">Ranking global de locales.</p>
-            <TopVenues venues={mappedTopVenues} />
+        <TopVenues venues={mappedTopVenues} />
           </div>
 
           <div className="bg-white border border-primary/10 rounded-xl p-4 shadow-sm">

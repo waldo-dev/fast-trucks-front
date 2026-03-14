@@ -36,6 +36,21 @@ const formatClp = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value || 0);
 
+const formatRegisterStatus = (status?: string) => {
+  const normalized = (status || '').toString().toUpperCase();
+  switch (normalized) {
+    case 'OPEN':
+    case 'OPENED':
+      return 'Abierta';
+    case 'CLOSED':
+      return 'Cerrada';
+    case 'PENDING':
+      return 'Pendiente';
+    default:
+      return status || 'Abierta';
+  }
+};
+
 const today = new Date();
 const toInputDate = (d: Date) => {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -76,9 +91,9 @@ export default function PosCierreCajaPage() {
   const [activeRegister, setActiveRegister] = useState<any | null>(null);
   const [movements, setMovements] = useState<any[]>([]);
   const [loadingRegister, setLoadingRegister] = useState(false);
-  const [openingAmount, setOpeningAmount] = useState<number>(0);
+  const [openingAmount, setOpeningAmount] = useState<number>();
   const [allowMultiple, setAllowMultiple] = useState(false);
-  const [closingAmount, setClosingAmount] = useState<number>(0);
+  const [closingAmount, setClosingAmount] = useState<number>();
   const [movementForm, setMovementForm] = useState<{
     type: 'IN' | 'OUT';
     amount: number;
@@ -155,7 +170,7 @@ export default function PosCierreCajaPage() {
       toast.error('No hay negocio seleccionado para abrir caja.');
       return;
     }
-    if (openingAmount < 0) {
+    if (openingAmount && openingAmount < 0) {
       toast.error('El monto de apertura no puede ser negativo.');
       return;
     }
@@ -163,7 +178,7 @@ export default function PosCierreCajaPage() {
     try {
       await cashRegisterService.open({
         business_id: businessId,
-        opening_amount: openingAmount,
+        opening_amount: openingAmount || 0,
         opened_by: currentUser?.id,
         allowMultiple,
       });
@@ -180,14 +195,14 @@ export default function PosCierreCajaPage() {
 
   const handleCloseRegister = async () => {
     if (!activeRegister?.id) return;
-    if (closingAmount < 0) {
+    if (closingAmount && closingAmount < 0) {
       toast.error('El monto de cierre no puede ser negativo.');
       return;
     }
     setLoadingRegister(true);
     try {
       await cashRegisterService.close(activeRegister.id, {
-        closing_amount: closingAmount,
+        closing_amount: closingAmount || 0,
         closed_by: currentUser?.id,
       });
       toast.success('Caja cerrada');
@@ -212,8 +227,7 @@ export default function PosCierreCajaPage() {
     }
     setLoadingRegister(true);
     try {
-      await cashRegisterService.addMovement({
-        cash_register_id: activeRegister.id,
+      await cashRegisterService.addMovement(activeRegister.id, {
         type: movementForm.type,
         amount: movementForm.amount,
         payment_method: movementForm.payment_method,
@@ -253,42 +267,68 @@ export default function PosCierreCajaPage() {
     return { cash, card, debitCard, creditCard, transfer, webpay, other, total };
   }, [data]);
 
+  const handleRefreshRegister = () => {
+    loadActiveRegister();
+  };
+
   return (
     <div className="flex flex-col gap-5">
-      <div className="bg-white dark:bg-[#2d2419] border border-[#e6e0db] dark:border-[#3d3226] rounded-xl p-4 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
+      {/* Header y resumen rápido */}
+      <div className="bg-white dark:bg-[#2d2419] border border-[#e6e0db] dark:border-[#3d3226] rounded-xl p-4 shadow-sm space-y-3">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a7560]">
-              Caja
+              Gestión de caja
             </p>
-            <h2 className="text-lg font-bold text-[#181411] dark:text-white">Gestión de caja</h2>
+            <h2 className="text-xl font-bold text-[#181411] dark:text-white">
+              Estado y acciones del turno
+            </h2>
+            <p className="text-sm text-[#8a7560] dark:text-[#a3907d]">
+              Abre, refresca o cierra la caja y registra movimientos rápidos.
+            </p>
           </div>
-          <div className="text-sm text-gray-600 dark:text-gray-300">
-            {activeRegister
-              ? `Caja activa #${activeRegister.id}`
-              : businessId
+          <div className="flex flex-wrap gap-2 md:justify-end">
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#f5f2f0] text-[#8a7560] dark:bg-[#241c14] dark:text-[#d2b29b]">
+              {activeRegister
+                ? `Caja activa #${activeRegister.id}`
+                : businessId
                 ? 'Sin caja abierta'
                 : 'Sin negocio seleccionado'}
+            </span>
+            <button
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-primary/20 text-sm font-semibold text-primary hover:bg-primary/5"
+              onClick={handleRefreshRegister}
+            >
+              <span className="material-symbols-outlined text-sm">refresh</span>
+              Refrescar estado
+            </button>
           </div>
         </div>
 
+        {/* Panel principal: estado + abrir/cerrar + movimientos */}
         <div className="grid grid-cols-1 xl:grid-cols-[1.1fr,0.9fr] gap-4">
           <div className="space-y-3">
             <div className="border border-primary/10 dark:border-[#3d3226] rounded-lg p-3 space-y-3">
-              <h3 className="text-sm font-semibold text-[#181411] dark:text-white">Estado y acciones</h3>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="border border-primary/10 dark:border-[#3d3226] rounded-lg p-3 space-y-2">
-                  <div className="text-sm text-[#181411] dark:text-white font-semibold">Caja activa</div>
+                  <div className="flex items-center justify-between text-sm text-[#181411] dark:text-white font-semibold">
+                    <span>Caja</span>
+                    {activeRegister ? (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                        {formatRegisterStatus(activeRegister.status || 'OPEN')}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                        Cerrada
+                      </span>
+                    )}
+                  </div>
                   {loadingRegister ? (
                     <p className="text-sm text-gray-600 dark:text-gray-300">Cargando...</p>
                   ) : activeRegister ? (
                     <div className="space-y-1 text-sm text-[#181411] dark:text-white">
                       <p>
                         <span className="font-semibold">ID:</span> {activeRegister.id}
-                      </p>
-                      <p>
-                        <span className="font-semibold">Estado:</span>{' '}
-                        {activeRegister.status || 'OPEN'}
                       </p>
                       <p>
                         <span className="font-semibold">Apertura:</span>{' '}
@@ -311,7 +351,6 @@ export default function PosCierreCajaPage() {
                     <label className="text-xs font-semibold text-[#8a7560]">Monto de cierre</label>
                     <input
                       type="number"
-                      min={0}
                       step="100"
                       value={closingAmount}
                       onChange={(e) => setClosingAmount(Number(e.target.value))}
@@ -329,37 +368,35 @@ export default function PosCierreCajaPage() {
               </div>
 
               <div className="border border-primary/10 dark:border-[#3d3226] rounded-lg p-3 space-y-2">
-                <div className="text-sm font-semibold text-[#181411] dark:text-white">Abrir caja</div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <div className="md:col-span-2 flex flex-col gap-2">
-                    <label className="text-xs font-semibold text-[#8a7560]">Monto de apertura</label>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold text-[#181411] dark:text-white">Abrir caja</div>
+                  <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
                     <input
-                      type="number"
-                      min={0}
-                      step="100"
-                      value={openingAmount}
-                      onChange={(e) => setOpeningAmount(Number(e.target.value))}
-                      className="h-10 px-3 rounded-lg border border-primary/20 bg-white dark:bg-[#1f1a13] text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                      type="checkbox"
+                      className="accent-primary"
+                      checked={allowMultiple}
+                      onChange={(e) => setAllowMultiple(e.target.checked)}
                     />
-                    <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        className="accent-primary"
-                        checked={allowMultiple}
-                        onChange={(e) => setAllowMultiple(e.target.checked)}
-                      />
-                      Permitir múltiples cajas abiertas
-                    </label>
-                  </div>
-                  <div className="flex items-end">
-                    <button
-                      onClick={handleOpenRegister}
-                      disabled={loadingRegister || !businessId}
-                      className="w-full h-10 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-60"
-                    >
-                      {loadingRegister ? 'Procesando...' : 'Abrir caja'}
-                    </button>
-                  </div>
+                    Múltiples abiertas
+                  </label>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-[1fr,140px] gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step="100"
+                    value={openingAmount}
+                    onChange={(e) => setOpeningAmount(Number(e.target.value))}
+                    className="h-10 px-3 rounded-lg border border-primary/20 bg-white dark:bg-[#1f1a13] text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                    placeholder="Monto de apertura"
+                  />
+                  <button
+                    onClick={handleOpenRegister}
+                    disabled={loadingRegister || !businessId}
+                    className="h-10 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-60"
+                  >
+                    {loadingRegister ? 'Procesando...' : 'Abrir caja'}
+                  </button>
                 </div>
               </div>
             </div>
@@ -446,7 +483,12 @@ export default function PosCierreCajaPage() {
             </div>
 
             <div className="border border-primary/10 dark:border-[#3d3226] rounded-lg p-3 space-y-2">
-              <h3 className="text-sm font-semibold text-[#181411] dark:text-white">Movimientos</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-[#181411] dark:text-white">Movimientos</h3>
+                <span className="text-xs text-gray-500">
+                  {movements.length ? `${movements.length} mov.` : 'Sin movimientos'}
+                </span>
+              </div>
               {loadingRegister ? (
                 <p className="text-sm text-gray-600 dark:text-gray-300">Cargando...</p>
               ) : !movements.length ? (
@@ -476,92 +518,95 @@ export default function PosCierreCajaPage() {
         </div>
       </div>
 
-      <div className="space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a7560]">
-          Terminal Punto de Venta
-        </p>
-        <h1 className="text-2xl font-black text-[#181411] dark:text-white">Gestión de Caja</h1>
-        <p className="text-[#8a7560] dark:text-[#a3907d]">
-          Abrir, cerrar y mover caja; además consulta el resumen del turno.
-        </p>
-      </div>
-
-      <div className="bg-white dark:bg-[#2d2419] border border-[#e6e0db] dark:border-[#3d3226] rounded-xl p-4 shadow-sm flex flex-wrap gap-3 items-end">
-        <div className="flex flex-col">
-          <label className="text-xs font-semibold text-[#8a7560] mb-1">Inicio</label>
-          <input
-            type="date"
-            className="border border-primary/20 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#1f1a13]"
-            value={startDate}
-            onChange={(e) => {
-              const nextStart = e.target.value;
-              setStartDate(nextStart);
-              if (endDate && nextStart && endDate < nextStart) {
-                setEndDate(nextStart);
-              }
-            }}
-          />
-        </div>
-        <div className="flex flex-col">
-          <label className="text-xs font-semibold text-[#8a7560] mb-1">Fin</label>
-          <input
-            type="date"
-            className="border border-primary/20 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#1f1a13]"
-            value={endDate}
-            min={startDate || undefined}
-            onChange={(e) => setEndDate(e.target.value)}
-          />
-        </div>
-        <div className="flex flex-col">
-          <label className="text-xs font-semibold text-[#8a7560] mb-1">IVA</label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            max="1"
-            className="border border-primary/20 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#1f1a13]"
-            value={vatRate}
-            onChange={(e) => setVatRate(Number(e.target.value))}
-          />
-        </div>
-        <button
-          className="px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:bg-primary/90 disabled:opacity-60"
-          onClick={loadCloseout}
-          disabled={loading}
-        >
-          {loading ? 'Actualizando...' : 'Actualizar'}
-        </button>
-        {error && <span className="text-xs text-red-600">{error}</span>}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        <SummaryCard label="Total ventas brutas" value={formatClp(data?.gross_sales || 0)} />
-        <SummaryCard label="Total ventas netas" value={formatClp(data?.net_sales || 0)} />
-        <SummaryCard label="Impuestos (IVA)" value={formatClp(data?.taxes || 0)} />
-        <SummaryCard label="Cantidad boletas/facturas" value={`${data?.receipt_count ?? 0}`} />
-        <SummaryCard label="Ventas anuladas" value={formatClp(data?.cancelled_sales || 0)} />
-        <SummaryCard label="Descuentos aplicados" value={formatClp(data?.discounts_applied || 0)} />
-      </div>
-
-      <div className="bg-white dark:bg-[#2d2419] border border-[#e6e0db] dark:border-[#3d3226] rounded-xl p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
+      {/* Resumen de ventas y filtros */}
+      <div className="bg-white dark:bg-[#2d2419] border border-[#e6e0db] dark:border-[#3d3226] rounded-xl p-4 shadow-sm space-y-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
           <div>
-            <h2 className="text-lg font-bold text-[#181411] dark:text-white">
-              Desglose por medio de pago
-            </h2>
-            <p className="text-sm text-[#6b7280] dark:text-[#a3907d]">
-              Control de recaudación por método.
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a7560]">
+              Resumen del periodo
+            </p>
+            <h1 className="text-xl font-black text-[#181411] dark:text-white">Ventas y cierre</h1>
+            <p className="text-sm text-[#8a7560] dark:text-[#a3907d]">
+              Ajusta fechas para ver el resumen y desglose por medio de pago.
             </p>
           </div>
-          {loading && <span className="text-xs text-gray-500">Actualizando...</span>}
+          <div className="flex flex-wrap gap-2 items-end">
+            <div className="flex flex-col">
+              <label className="text-xs font-semibold text-[#8a7560] mb-1">Inicio</label>
+              <input
+                type="date"
+                className="border border-primary/20 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#1f1a13]"
+                value={startDate}
+                onChange={(e) => {
+                  const nextStart = e.target.value;
+                  setStartDate(nextStart);
+                  if (endDate && nextStart && endDate < nextStart) {
+                    setEndDate(nextStart);
+                  }
+                }}
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-xs font-semibold text-[#8a7560] mb-1">Fin</label>
+              <input
+                type="date"
+                className="border border-primary/20 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#1f1a13]"
+                value={endDate}
+                min={startDate || undefined}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col w-28">
+              <label className="text-xs font-semibold text-[#8a7560] mb-1">IVA</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="1"
+                className="border border-primary/20 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#1f1a13]"
+                value={vatRate}
+                onChange={(e) => setVatRate(Number(e.target.value))}
+              />
+            </div>
+            <button
+              className="px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:bg-primary/90 disabled:opacity-60"
+              onClick={loadCloseout}
+              disabled={loading}
+            >
+              {loading ? 'Actualizando...' : 'Actualizar'}
+            </button>
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          <PaymentCard label="Efectivo" value={formatClp(payments.cash)} />
-          <PaymentCard label="Débito" value={formatClp(payments.debitCard || payments.card)} />
-          <PaymentCard label="Crédito" value={formatClp(payments.creditCard || payments.card)} />
-          <PaymentCard label="Transferencia" value={formatClp(payments.transfer)} />
-          <PaymentCard label="Otros (QR / MP / etc.)" value={formatClp(payments.other)} />
-          <PaymentCard label="Total recaudado" value={formatClp(payments.total)} highlighted />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <SummaryCard label="Total ventas brutas" value={formatClp(data?.gross_sales || 0)} />
+          <SummaryCard label="Total ventas netas" value={formatClp(data?.net_sales || 0)} />
+          <SummaryCard label="Impuestos (IVA)" value={formatClp(data?.taxes || 0)} />
+          <SummaryCard label="Cantidad boletas/facturas" value={`${data?.receipt_count ?? 0}`} />
+          <SummaryCard label="Ventas anuladas" value={formatClp(data?.cancelled_sales || 0)} />
+          <SummaryCard label="Descuentos aplicados" value={formatClp(data?.discounts_applied || 0)} />
+        </div>
+
+        <div className="border border-primary/10 dark:border-[#3d3226] rounded-xl p-4 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-[#181411] dark:text-white">
+                Desglose por medio de pago
+              </h2>
+              <p className="text-sm text-[#6b7280] dark:text-[#a3907d]">
+                Control de recaudación por método.
+              </p>
+            </div>
+            {loading && <span className="text-xs text-gray-500">Actualizando...</span>}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            <PaymentCard label="Efectivo" value={formatClp(payments.cash)} />
+            <PaymentCard label="Débito" value={formatClp(payments.debitCard || payments.card)} />
+            <PaymentCard label="Crédito" value={formatClp(payments.creditCard || payments.card)} />
+            <PaymentCard label="Transferencia" value={formatClp(payments.transfer)} />
+            <PaymentCard label="Otros (QR / MP / etc.)" value={formatClp(payments.other)} />
+            <PaymentCard label="Total recaudado" value={formatClp(payments.total)} highlighted />
+          </div>
         </div>
       </div>
     </div>

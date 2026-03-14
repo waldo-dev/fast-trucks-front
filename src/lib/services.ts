@@ -365,16 +365,22 @@ export const cashRegisterService = {
   ) => api.post(`cash-registers/${id}/close`, data, { auth: true }),
   getActive: (params: { business_id: string | number; location_id?: string | number }) =>
     api.get(`cash-registers/active${qs(params)}`, { auth: true }),
-  addMovement: (data: {
-    cash_register_id: string | number;
-    type: string;
-    amount: number;
-    payment_method?: string;
-    order_id?: string | number;
-    notes?: string;
-  }) => api.post("cash-registers/movements", data, { auth: true }),
+  addMovement: (
+    id: string | number,
+    data: {
+      type: string;
+      amount: number;
+      payment_method?: string;
+      order_id?: string | number;
+      notes?: string;
+    }
+  ) => api.post(`cash-registers/${id}/movements`, data, { auth: true }),
   listMovements: (id: string | number) =>
     api.get(`cash-registers/${id}/movements`, { auth: true }),
+  summary: (id: string | number) =>
+    api.get(`cash-registers/${id}/summary`, { auth: true }),
+  history: (params?: { business_id?: string | number }) =>
+    api.get(`cash-register/history${qs(params)}`, { auth: true }),
 };
 
 export const mailingService = {

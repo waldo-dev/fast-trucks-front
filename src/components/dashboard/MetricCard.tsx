@@ -65,9 +65,9 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           <span className="material-symbols-outlined">{icon}</span>
         </div>
         {hasChange && (
-          <span className={`${getChangeColor()} text-xs font-bold px-2 py-1 rounded-full`}>
-            {change}
-          </span>
+        <span className={`${getChangeColor()} text-xs font-bold px-2 py-1 rounded-full`}>
+          {change}
+        </span>
         )}
       </div>
       <p className={`text-[#8a7560] ${compact ? 'text-xs' : 'text-sm'} font-medium mb-1`}>
