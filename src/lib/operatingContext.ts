@@ -1,12 +1,13 @@
 import { getCachedUser } from './auth';
 import { normalizeTier, PlanTier } from './planAccess';
+import { OPERATING_CONTEXT_KEY } from './storageKeys';
 
 export type OperatingContext =
   | { type: 'event'; event_id?: string; event_name?: string; business_id?: string }
   | { type: 'business'; business_id?: string; planTier?: PlanTier; business_name?: string }
   | null;
 
-const STORAGE_KEY = 'business_operating_context';
+const STORAGE_KEY = OPERATING_CONTEXT_KEY;
 
 export const readOperatingContext = (): OperatingContext => {
   if (typeof window === 'undefined') return null;

@@ -1,4 +1,10 @@
 import { api } from './api';
+import {
+  ACCESS_TOKEN_KEY,
+  REFRESH_TOKEN_KEY,
+  USER_KEY,
+  OPERATING_CONTEXT_KEY,
+} from './storageKeys';
 
 type StoredUser = {
   id: string;
@@ -50,10 +56,6 @@ type NormalizedSession = {
   refreshToken?: string;
   user: StoredUser;
 };
-
-const ACCESS_TOKEN_KEY = 'fasttrucks_access_token';
-const REFRESH_TOKEN_KEY = 'fasttrucks_refresh_token';
-const USER_KEY = 'fasttrucks_user';
 
 const isBrowser = () => typeof window !== 'undefined';
 
@@ -118,6 +120,27 @@ const normalizeLoginResponse = (data: LoginApiResponse['data']): NormalizedSessi
   };
 };
 
+const clearBrowserCookies = () => {
+  if (!isBrowser()) return;
+
+  const cookies =
+    typeof document !== 'undefined' && document.cookie ? document.cookie.split(';') : [];
+
+  cookies.forEach((cookie) => {
+    const cookieName = cookie.split('=')[0]?.trim();
+    if (!cookieName) return;
+    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+  });
+};
+
+const clearOperatingContext = () => {
+  if (!isBrowser()) return;
+
+  [localStorage, sessionStorage].forEach((storage) => {
+    storage.removeItem(OPERATING_CONTEXT_KEY);
+  });
+};
+
 const clearStoredSession = () => {
   if (!isBrowser()) return;
   [localStorage, sessionStorage].forEach((storage) => {
@@ -125,6 +148,8 @@ const clearStoredSession = () => {
     storage.removeItem(REFRESH_TOKEN_KEY);
     storage.removeItem(USER_KEY);
   });
+  clearOperatingContext();
+  clearBrowserCookies();
 };
 
 const storeSession = (data: NormalizedSession) => {

@@ -1,14 +1,15 @@
 import { config } from './config';
+import {
+  ACCESS_TOKEN_KEY,
+  REFRESH_TOKEN_KEY,
+  USER_KEY,
+} from './storageKeys';
 
 /**
  * API client for making HTTP requests to the backend
  * Uses environment variables for configuration
  */
 type ApiRequestOptions = RequestInit & { auth?: boolean };
-
-const ACCESS_TOKEN_KEY = 'fasttrucks_access_token';
-const REFRESH_TOKEN_KEY = 'fasttrucks_refresh_token';
-const USER_KEY = 'fasttrucks_user';
 
 class ApiClient {
   private baseUrl: string;
