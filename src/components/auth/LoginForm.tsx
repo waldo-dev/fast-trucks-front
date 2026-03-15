@@ -19,7 +19,7 @@ export const LoginForm = () => {
     setError(null);
     setLoading(true);
     try {
-      const sessionUser = await login(email, password, { remember: rememberMe });
+      const sessionUser = await login(email.toLowerCase(), password, { remember: rememberMe });
       const role = sessionUser?.role?.toUpperCase();
       const destination =
         role === 'ADMIN' ? '/admin' : role === 'LOCAL_OPERATOR' ? '/pos' : '/';

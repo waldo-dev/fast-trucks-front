@@ -727,7 +727,7 @@ export const UsersView = ({ scope }: UsersViewProps) => {
                     await toast.promise(
                       userService.update(editingUser.id, {
                         name: form.name,
-                        email: form.email,
+                        email: form.email.toLowerCase(),
                         role: form.role,
                         active: form.active,
                         business_ids: businessIds.map((b) => Number(b)),
@@ -742,7 +742,7 @@ export const UsersView = ({ scope }: UsersViewProps) => {
                     await toast.promise(
                       userService.create({
                         name: form.name,
-                        email: form.email,
+                        email: form.email.toLowerCase(),
                         password: form.password,
                         role: form.role,
                         business_ids: businessIds.map((b) => Number(b)),
