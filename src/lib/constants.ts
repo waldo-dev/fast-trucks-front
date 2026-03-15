@@ -27,6 +27,11 @@ export const SIDEBAR_ITEMS = [
     icon: 'shopping_bag',
   },
   {
+    title: 'Pagos',
+    href: '/payments',
+    icon: 'payments',
+  },
+  {
     title: 'Clientes',
     href: '/customers',
     icon: 'group',
@@ -35,11 +40,6 @@ export const SIDEBAR_ITEMS = [
     title: 'Eventos',
     href: '/events',
     icon: 'event',
-  },
-  {
-    title: 'Analítica de Eventos',
-    href: '/events/analytics',
-    icon: 'query_stats',
   },
   {
     title: 'Mailing',
@@ -131,7 +131,7 @@ export const OPERATOR_SIDEBAR_ITEMS = [
     icon: 'history',
   },
   {
-    title: 'Gestión de Caja',
+    title: 'Cierre de Caja',
     href: '/pos/cierre-caja',
     icon: 'lock_open',
   },

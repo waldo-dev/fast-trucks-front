@@ -1,5 +1,6 @@
 import { api } from "./api";
 import { config } from "./config";
+import { readOperatingContext } from "./operatingContext";
 
 const qs = (params?: Record<string, string | number | boolean | undefined>) => {
   if (!params) return "";
@@ -12,6 +13,23 @@ const qs = (params?: Record<string, string | number | boolean | undefined>) => {
   ).toString();
   return query ? `?${query}` : "";
 };
+
+const includeOperatingBusiness = (params?: { business_id?: string | number }) => {
+  const businessId = readOperatingContext()?.business_id;
+  if (!businessId) return params;
+  if (params?.business_id) return params;
+  return { ...params, business_id: businessId };
+};
+
+const ensureEventId = (id?: string | number) => {
+  if (id) return id;
+  const ctx = readOperatingContext();
+  const cachedId = ctx?.type === "event" ? ctx.event_id : undefined;
+  if (cachedId) return cachedId;
+  throw new Error("event_id requerido para crear o listar gastos");
+};
+
+const eventPath = (id?: string | number) => `events/${ensureEventId(id)}`;
 
 export const businessService = {
   list: () => api.get("business", { auth: true }),
@@ -301,14 +319,23 @@ export const eventService = {
   analytics: (params?: { limit?: number }) =>
     api.get(`events/analytics${qs(params as any)}`, { auth: true }),
   summary: (id: string | number) => api.get(`events/${id}/summary`, { auth: true }),
-  listExpenses: (id: string | number) =>
-    api.get(`events/${id}/expenses`, { auth: true }),
+  listExpenses: (id: string | number, params?: { business_id?: string | number }) =>
+    api.get(`${eventPath(id)}/expenses${qs(includeOperatingBusiness(params))}`, { auth: true }),
   createExpense: (
     id: string | number,
-    data: { type?: string; description?: string; amount: number }
-  ) => api.post(`events/${id}/expenses`, data, { auth: true }),
-  deleteExpense: (id: string | number, expenseId: string | number) =>
-    api.delete(`events/${id}/expenses/${expenseId}`, { auth: true }),
+    data: { type?: string; description?: string; amount: number },
+    params?: { business_id?: string | number }
+  ) =>
+    api.post(`${eventPath(id)}/expenses${qs(includeOperatingBusiness(params))}`, data, { auth: true }),
+  deleteExpense: (
+    id: string | number,
+    expenseId: string | number,
+    params?: { business_id?: string | number }
+  ) =>
+    api.delete(
+      `${eventPath(id)}/expenses/${expenseId}${qs(includeOperatingBusiness(params))}`,
+      { auth: true }
+    ),
   // Exports removidos; los endpoints definidos son sólo JSON
 };
 

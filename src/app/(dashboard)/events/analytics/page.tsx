@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { eventService } from '@/lib/services';
 import { readOperatingContext } from '@/lib/operatingContext';
@@ -107,73 +107,79 @@ export default function EventsAnalyticsPage() {
     }
   };
 
-  const fetchSummary = async (eventId?: string) => {
-    if (!eventId || !businessId || !canSeeReports) return;
-    setLoadingSummary(true);
-    try {
-      const resp = await eventService.summary(eventId);
-      const raw = (resp as any)?.data ?? resp;
-      const payments = raw?.payment_breakdown
-        ? Object.entries(raw.payment_breakdown).map(([method, total]) => {
-            const label = normalizePayment(method);
-            return {
-              method: label,
-              total: Number(total) || 0,
-            };
-          })
-        : [];
-      const topProducts =
-        Array.isArray(raw?.top_products) && raw.top_products.length
-          ? raw.top_products.map((p: any, idx: number) => ({
-              name: p.name || `Producto ${idx + 1}`,
-              qty: Number(p.quantity || p.qty) || 0,
-              revenue: Number(p.revenue) || 0,
-            }))
+  const fetchSummary = useCallback(
+    async (eventId?: string) => {
+      if (!eventId || !businessId || !canSeeReports) return;
+      setLoadingSummary(true);
+      try {
+        const resp = await eventService.summary(eventId);
+        const raw = (resp as any)?.data ?? resp;
+        const payments = raw?.payment_breakdown
+          ? Object.entries(raw.payment_breakdown).map(([method, total]) => {
+              const label = normalizePayment(method);
+              return {
+                method: label,
+                total: Number(total) || 0,
+              };
+            })
           : [];
+        const topProducts =
+          Array.isArray(raw?.top_products) && raw.top_products.length
+            ? raw.top_products.map((p: any, idx: number) => ({
+                name: p.name || `Producto ${idx + 1}`,
+                qty: Number(p.quantity || p.qty) || 0,
+                revenue: Number(p.revenue) || 0,
+              }))
+            : [];
 
-      setSummary({
-        sales: Number(raw?.sales) || 0,
-        tickets: Number(raw?.tickets) || 0,
-        avg_ticket: Number(raw?.avg_ticket) || 0,
-        expenses: Number(raw?.expenses?.total || raw?.expenses) || 0,
-        cogs: Number(raw?.cogs) || undefined,
-        margin: Number(raw?.margin) || 0,
-        margin_pct: raw?.margin_pct !== undefined ? Number(raw.margin_pct) : undefined,
-        payments,
-        top_products: topProducts,
-      });
-    } catch {
-      toast.error('No se pudo cargar el resumen del evento');
-      setSummary(null);
-    } finally {
-      setLoadingSummary(false);
-    }
-  };
-
-  const fetchExpenses = async (eventId?: string) => {
-    if (!eventId || !canSeeReports) return;
-    setLoadingExpenses(true);
-    try {
-      const resp = await eventService.listExpenses(eventId);
-      const data = (resp as any)?.data ?? resp;
-      if (Array.isArray(data)) {
-        setExpenses(
-          data.map((ex: any) => ({
-            id: String(ex.id),
-            type: ex.type,
-            description: ex.description,
-            amount: Number(ex.amount) || 0,
-          }))
-        );
-      } else {
-        setExpenses([]);
+        setSummary({
+          sales: Number(raw?.sales) || 0,
+          tickets: Number(raw?.tickets) || 0,
+          avg_ticket: Number(raw?.avg_ticket) || 0,
+          expenses: Number(raw?.expenses?.total || raw?.expenses) || 0,
+          cogs: Number(raw?.cogs) || undefined,
+          margin: Number(raw?.margin) || 0,
+          margin_pct: raw?.margin_pct !== undefined ? Number(raw.margin_pct) : undefined,
+          payments,
+          top_products: topProducts,
+        });
+      } catch {
+        toast.error('No se pudo cargar el resumen del evento');
+        setSummary(null);
+      } finally {
+        setLoadingSummary(false);
       }
-    } catch {
-      setExpenses([]);
-    } finally {
-      setLoadingExpenses(false);
-    }
-  };
+    },
+    [businessId, canSeeReports]
+  );
+
+  const fetchExpenses = useCallback(
+    async (eventId?: string) => {
+      if (!eventId || !businessId || !canSeeReports) return;
+      setLoadingExpenses(true);
+      try {
+        const resp = await eventService.listExpenses(eventId, businessId ? { business_id: businessId } : undefined);
+        const data = (resp as any)?.data ?? resp;
+        if (Array.isArray(data)) {
+          setExpenses(
+            data.map((ex: any) => ({
+              id: String(ex.id),
+              type: ex.type,
+              description: ex.description,
+              amount: Number(ex.amount) || 0,
+            }))
+          );
+        } else {
+          setExpenses([]);
+        }
+      } catch {
+        setExpenses([]);
+      } finally {
+        setLoadingExpenses(false);
+      }
+    },
+    [businessId, canSeeReports]
+  );
 
   useEffect(() => {
     fetchAnalytics();
@@ -181,15 +187,14 @@ export default function EventsAnalyticsPage() {
   }, [businessId, limit]);
 
   useEffect(() => {
-    if (selectedEventId) {
-      fetchSummary(selectedEventId);
-      fetchExpenses(selectedEventId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEventId]);
+    if (!selectedEventId) return;
+    fetchSummary(selectedEventId);
+    fetchExpenses(selectedEventId);
+  }, [selectedEventId, fetchSummary, fetchExpenses]);
 
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("🚀 ~ handleAddExpense ~ selectedEventId:", selectedEventId)
     if (!selectedEventId) return;
     const amountNum = Number(newExpense.amount);
     if (!Number.isFinite(amountNum) || amountNum <= 0) {
@@ -214,7 +219,11 @@ export default function EventsAnalyticsPage() {
   const handleDeleteExpense = async (expenseId: string) => {
     if (!selectedEventId) return;
     try {
-      await eventService.deleteExpense(selectedEventId, expenseId);
+      await eventService.deleteExpense(
+        selectedEventId,
+        expenseId,
+        businessId ? { business_id: businessId } : undefined
+      );
       toast.success('Gasto eliminado');
       fetchSummary(selectedEventId);
       fetchExpenses(selectedEventId);

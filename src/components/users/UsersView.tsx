@@ -691,210 +691,210 @@ export const UsersView = ({ scope }: UsersViewProps) => {
               <span className="material-symbols-outlined">close</span>
             </button>
             <div className="overflow-y-auto px-6 py-6 space-y-4">
-              <h3 className="text-lg font-bold text-[#181411] dark:text-white mb-1">
-                {editingUser ? 'Editar usuario' : 'Crear usuario'}
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-[#a3907d] mb-4">
-                Completa la información y asigna el rol y los locales permitidos.
-              </p>
-              <form
-                className="grid grid-cols-1 md:grid-cols-2 gap-4"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  setModalError(null);
-                  const allowedRoles =
-                    cachedRole === 'ADMIN'
-                      ? ['ADMIN', 'BUSINESS_OWNER', 'LOCAL_OPERATOR']
-                      : ['BUSINESS_OWNER', 'LOCAL_OPERATOR'];
-                  if (!allowedRoles.includes(form.role)) {
-                    setModalError('No puedes asignar ese rol.');
-                    return;
-                  }
-                  const businessIds =
-                    form.businessIds.length > 0
-                      ? form.businessIds
-                      : scope === 'owner' && (selectedBusiness || cachedBusinessId)
-                      ? [String(selectedBusiness || cachedBusinessId)]
-                      : [];
-                  if (!businessIds.length) {
-                    setModalError('Selecciona al menos un negocio.');
-                    return;
-                  }
+            <h3 className="text-lg font-bold text-[#181411] dark:text-white mb-1">
+              {editingUser ? 'Editar usuario' : 'Crear usuario'}
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-[#a3907d] mb-4">
+              Completa la información y asigna el rol y los locales permitidos.
+            </p>
+            <form
+              className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setModalError(null);
+                const allowedRoles =
+                  cachedRole === 'ADMIN'
+                    ? ['ADMIN', 'BUSINESS_OWNER', 'LOCAL_OPERATOR']
+                    : ['BUSINESS_OWNER', 'LOCAL_OPERATOR'];
+                if (!allowedRoles.includes(form.role)) {
+                  setModalError('No puedes asignar ese rol.');
+                  return;
+                }
+                const businessIds =
+                  form.businessIds.length > 0
+                    ? form.businessIds
+                    : scope === 'owner' && (selectedBusiness || cachedBusinessId)
+                    ? [String(selectedBusiness || cachedBusinessId)]
+                    : [];
+                if (!businessIds.length) {
+                  setModalError('Selecciona al menos un negocio.');
+                  return;
+                }
 
-                  setModalSaving(true);
-                  try {
-                    if (editingUser) {
-                      await toast.promise(
-                        userService.update(editingUser.id, {
-                          name: form.name,
-                          email: form.email,
-                          role: form.role,
-                          active: form.active,
-                          business_ids: businessIds.map((b) => Number(b)),
-                        }),
-                        {
-                          pending: 'Guardando usuario...',
-                          success: 'Usuario actualizado correctamente',
-                          error: 'No se pudo guardar el usuario',
-                        }
-                      );
-                    } else {
-                      await toast.promise(
-                        userService.create({
-                          name: form.name,
-                          email: form.email,
-                          password: form.password,
-                          role: form.role,
-                          business_ids: businessIds.map((b) => Number(b)),
-                        }),
-                        {
-                          pending: 'Creando usuario...',
-                          success: 'Usuario creado correctamente',
-                          error: 'No se pudo guardar el usuario',
-                        }
-                      );
-                    }
-                    setModalOpen(false);
-                    setEditingUser(null);
-                    setForm({
-                      name: '',
-                      email: '',
-                      password: '',
-                      role: scope === 'admin' ? 'ADMIN' : 'BUSINESS_OWNER',
-                      active: true,
-                      businessIds: [],
-                    });
-                    setReloadKey((n) => n + 1);
-                  } catch (err) {
-                    const msg = friendlyUserError(err, 'No se pudo guardar el usuario');
-                    setModalError(msg);
-                    toast.error(msg);
-                  } finally {
-                    setModalSaving(false);
+                setModalSaving(true);
+                try {
+                  if (editingUser) {
+                    await toast.promise(
+                      userService.update(editingUser.id, {
+                        name: form.name,
+                        email: form.email,
+                        role: form.role,
+                        active: form.active,
+                        business_ids: businessIds.map((b) => Number(b)),
+                      }),
+                      {
+                        pending: 'Guardando usuario...',
+                        success: 'Usuario actualizado correctamente',
+                        error: 'No se pudo guardar el usuario',
+                      }
+                    );
+                  } else {
+                    await toast.promise(
+                      userService.create({
+                        name: form.name,
+                        email: form.email,
+                        password: form.password,
+                        role: form.role,
+                        business_ids: businessIds.map((b) => Number(b)),
+                      }),
+                      {
+                        pending: 'Creando usuario...',
+                        success: 'Usuario creado correctamente',
+                        error: 'No se pudo guardar el usuario',
+                      }
+                    );
                   }
-                }}
-              >
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-semibold text-[#181411] dark:text-white">
-                    Nombre
-                  </label>
-                  <input
-                    className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none dark:bg-[#241c14] dark:border-[#3d3326] dark:text-white"
-                    value={form.name}
-                    onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-semibold text-[#181411] dark:text-white">
-                    Email
-                  </label>
-                  <input
-                    className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none dark:bg-[#241c14] dark:border-[#3d3326] dark:text-white"
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                    required
-                  />
-                </div>
-                {!editingUser && (
-                  <div className="flex flex-col gap-2 md:col-span-2">
-                    <label className="text-sm font-semibold text-[#181411] dark:text-white">
-                      Contraseña
-                    </label>
-                    <input
-                      className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none dark:bg-[#241c14] dark:border-[#3d3326] dark:text-white"
-                      type="password"
-                      value={form.password}
-                      onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                      required
-                    />
-                  </div>
-                )}
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-semibold text-[#181411] dark:text-white">
-                    Rol
-                  </label>
-                  <select
-                    className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none dark:bg-[#241c14] dark:border-[#3d3326] dark:text-white"
-                    value={form.role}
-                    onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
-                  >
-                    {cachedRole === 'ADMIN' && <option value="ADMIN">Admin</option>}
-                    {cachedRole === 'ADMIN' && <option value="BUSINESS_OWNER">Dueño de negocio</option>}
-                    <option value="LOCAL_OPERATOR">Operador de local</option>
-                  </select>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-semibold text-[#181411] dark:text-white">
-                    Activo
-                  </label>
-                  <select
-                    className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none dark:bg-[#241c14] dark:border-[#3d3326] dark:text-white"
-                    value={form.active ? '1' : '0'}
-                    onChange={(e) => setForm((p) => ({ ...p, active: e.target.value === '1' }))}
-                  >
-                    <option value="1">Sí</option>
-                    <option value="0">No</option>
-                  </select>
-                </div>
+                  setModalOpen(false);
+                  setEditingUser(null);
+                  setForm({
+                    name: '',
+                    email: '',
+                    password: '',
+                    role: scope === 'admin' ? 'ADMIN' : 'BUSINESS_OWNER',
+                    active: true,
+                    businessIds: [],
+                  });
+                  setReloadKey((n) => n + 1);
+                } catch (err) {
+                  const msg = friendlyUserError(err, 'No se pudo guardar el usuario');
+                  setModalError(msg);
+                  toast.error(msg);
+                } finally {
+                  setModalSaving(false);
+                }
+              }}
+            >
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-semibold text-[#181411] dark:text-white">
+                  Nombre
+                </label>
+                <input
+                  className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none dark:bg-[#241c14] dark:border-[#3d3326] dark:text-white"
+                  value={form.name}
+                  onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-semibold text-[#181411] dark:text-white">
+                  Email
+                </label>
+                <input
+                  className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none dark:bg-[#241c14] dark:border-[#3d3326] dark:text-white"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+                  required
+                />
+              </div>
+              {!editingUser && (
                 <div className="flex flex-col gap-2 md:col-span-2">
                   <label className="text-sm font-semibold text-[#181411] dark:text-white">
-                    Asociar a negocios
+                    Contraseña
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {businesses.map((b) => {
-                      const checked = form.businessIds.includes(b.id);
-                      return (
-                        <label
-                          key={b.id}
-                          className="flex items-center gap-2 px-3 py-2 border rounded-lg cursor-pointer hover:border-primary/40 dark:border-[#3d3326] dark:hover:border-primary/60"
-                        >
-                          <input
-                            type="checkbox"
-                            className="text-primary border-gray-300 rounded focus:ring-primary"
-                            checked={checked}
-                            onChange={() =>
-                              setForm((prev) => ({
-                                ...prev,
-                                businessIds: checked
-                                  ? prev.businessIds.filter((id) => id !== b.id)
-                                  : [...prev.businessIds, b.id],
-                              }))
-                            }
-                          />
-                          <span className="text-sm text-gray-700 dark:text-[#d2b29b]">{b.name}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                  <input
+                    className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none dark:bg-[#241c14] dark:border-[#3d3326] dark:text-white"
+                    type="password"
+                    value={form.password}
+                    onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                    required
+                  />
                 </div>
-                {modalError && (
-                  <div className="md:col-span-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                    {modalError}
-                  </div>
-                )}
-                <div className="md:col-span-2 flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setModalOpen(false);
-                      setModalError(null);
-                      setEditingUser(null);
-                    }}
-                    className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={modalSaving}
-                    className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {modalSaving ? 'Guardando...' : editingUser ? 'Guardar cambios' : 'Crear usuario'}
-                  </button>
+              )}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-semibold text-[#181411] dark:text-white">
+                  Rol
+                </label>
+                <select
+                  className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none dark:bg-[#241c14] dark:border-[#3d3326] dark:text-white"
+                  value={form.role}
+                  onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
+                >
+                  {cachedRole === 'ADMIN' && <option value="ADMIN">Admin</option>}
+                  {cachedRole === 'ADMIN' && <option value="BUSINESS_OWNER">Dueño de negocio</option>}
+                  <option value="LOCAL_OPERATOR">Operador de local</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-semibold text-[#181411] dark:text-white">
+                  Activo
+                </label>
+                <select
+                  className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none dark:bg-[#241c14] dark:border-[#3d3326] dark:text-white"
+                  value={form.active ? '1' : '0'}
+                  onChange={(e) => setForm((p) => ({ ...p, active: e.target.value === '1' }))}
+                >
+                  <option value="1">Sí</option>
+                  <option value="0">No</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-2 md:col-span-2">
+                <label className="text-sm font-semibold text-[#181411] dark:text-white">
+                  Asociar a negocios
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {businesses.map((b) => {
+                    const checked = form.businessIds.includes(b.id);
+                    return (
+                      <label
+                        key={b.id}
+                        className="flex items-center gap-2 px-3 py-2 border rounded-lg cursor-pointer hover:border-primary/40 dark:border-[#3d3326] dark:hover:border-primary/60"
+                      >
+                        <input
+                          type="checkbox"
+                          className="text-primary border-gray-300 rounded focus:ring-primary"
+                          checked={checked}
+                          onChange={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              businessIds: checked
+                                ? prev.businessIds.filter((id) => id !== b.id)
+                                : [...prev.businessIds, b.id],
+                            }))
+                          }
+                        />
+                        <span className="text-sm text-gray-700 dark:text-[#d2b29b]">{b.name}</span>
+                      </label>
+                    );
+                  })}
                 </div>
-              </form>
+              </div>
+              {modalError && (
+                <div className="md:col-span-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                  {modalError}
+                </div>
+              )}
+              <div className="md:col-span-2 flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalOpen(false);
+                    setModalError(null);
+                    setEditingUser(null);
+                  }}
+                  className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={modalSaving}
+                  className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {modalSaving ? 'Guardando...' : editingUser ? 'Guardar cambios' : 'Crear usuario'}
+                </button>
+              </div>
+            </form>
             </div>
           </div>
         </div>
