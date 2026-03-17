@@ -34,6 +34,7 @@ type ApiOrder = {
 
 type OrdersByBusiness = {
   business_id?: string | number;
+  business_name?: string;
   orders?: ApiOrder[];
 };
 
@@ -153,7 +154,7 @@ export default function OrdersPage() {
 
   const normalizedOrders = useMemo<UiOrder[]>(() => {
     return ordersByBusiness.flatMap((group) => {
-      const venueName = group.business_id ? `Local ${group.business_id}` : 'Local sin nombre';
+      const venueName = group.business_name ? `Local ${group.business_name}` : 'Local sin nombre';
       return (group.orders || []).map((order, idx) => {
         const status = mapStatus(order.status);
         const backendId =
@@ -436,8 +437,8 @@ export default function OrdersPage() {
 
           {/* Mobile: tarjetas */}
           <div className="md:hidden divide-y divide-[#f0eae4]">
-            {paginatedOrders.map((order) => (
-              <div
+            {paginatedOrders.map((order) => {
+              return <div
                 key={order.id}
                 className="px-4 py-3 space-y-2 cursor-pointer active:scale-[0.99] transition"
                 onClick={() => handleViewDetails(order.backendId)}
@@ -499,8 +500,8 @@ export default function OrdersPage() {
                     <p className="text-xs text-[#8a7560]">{order.total}</p>
                   </div>
                 </div>
-              </div>
-            ))}
+              </div>;
+            })}
           </div>
         </div>
       )}

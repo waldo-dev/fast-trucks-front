@@ -55,8 +55,20 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (!ready || checking) {
     return (
-      <div className="w-full h-screen flex items-center justify-center text-[#181411]">
-        Cargando sesión...
+      <div
+        className="w-full h-screen flex flex-col items-center justify-center text-center gap-2"
+        role="status"
+        aria-live="polite"
+      >
+        <p
+          className="text-4xl sm:text-5xl font-black uppercase tracking-[0.4em] text-transparent bg-clip-text bg-gradient-to-r from-[#0f172b] via-[#0f172b] to-[#f27f0d] animate-pulse"
+          style={{ fontFamily: 'Along Sans, system-ui, sans-serif' }}
+        >
+          Operfoods
+        </p>
+        <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#0f172b]">
+          Cargando sesión...
+        </p>
       </div>
     );
   }

@@ -49,6 +49,7 @@ export default function AdminNegociosPage() {
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | number | null>(null);
   const [confirmDeleteName, setConfirmDeleteName] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const closeEditModal = () => {
     setEditModalOpen(false);
@@ -100,10 +101,27 @@ export default function AdminNegociosPage() {
     }
   };
 
+  const PAGE_SIZE = 8;
+  const totalPages = Math.max(1, Math.ceil(businesses.length / PAGE_SIZE));
+  const paginatedBusinesses = businesses.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
+
   useEffect(() => {
     loadBusinesses();
     loadPlans();
   }, []);
+
+  useEffect(() => {
+    if (businesses.length === 0) {
+      setCurrentPage(1);
+      return;
+    }
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [businesses.length, currentPage, totalPages]);
 
   const handleInput =
     (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -395,7 +413,7 @@ export default function AdminNegociosPage() {
         ) : (
           <>
             <div className="md:hidden space-y-3">
-              {businesses.map((b) => (
+              {paginatedBusinesses.map((b) => (
                 <div
                   key={b.id}
                   className="rounded-xl border border-[#e6e0db] dark:border-[#3d3226] bg-white dark:bg-[#2d2419] p-4 shadow-sm flex flex-col gap-2"
@@ -443,7 +461,7 @@ export default function AdminNegociosPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#f5f2f0] dark:divide-[#3d3226] bg-white dark:bg-[#2d2419]">
-                    {businesses.map((b) => (
+                    {paginatedBusinesses.map((b) => (
                       <tr key={b.id}>
                         <td className="py-2 px-3 text-[#181411] dark:text-white font-semibold">
                           {b.name || 'Sin nombre'}
@@ -476,6 +494,31 @@ export default function AdminNegociosPage() {
                 </table>
               </div>
             </div>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-xs text-[#8a7560]">
+                  Mostrando{' '}
+                  {businesses.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0}-
+                  {Math.min(currentPage * PAGE_SIZE, businesses.length)} de {businesses.length}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={currentPage === 1 || loading}
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    className="px-3 py-1 rounded-lg border border-[#e6e0db] text-xs text-[#181411] disabled:opacity-40"
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    type="button"
+                    disabled={currentPage === totalPages || loading}
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                    className="px-3 py-1 rounded-lg border border-[#e6e0db] text-xs text-[#181411] disabled:opacity-40"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              </div>
           </>
         )}
       </div>

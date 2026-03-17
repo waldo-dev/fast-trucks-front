@@ -8,6 +8,26 @@ export type OperatingContext =
   | null;
 
 const STORAGE_KEY = OPERATING_CONTEXT_KEY;
+export const OPERATING_CONTEXT_EVENT = 'business-operating-context-updated';
+
+const dispatchOperatingContextChange = (ctx: OperatingContext) => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(
+    new CustomEvent<OperatingContext | null>(OPERATING_CONTEXT_EVENT, {
+      detail: ctx ?? null,
+    })
+  );
+};
+
+export const watchOperatingContext = (handler: (ctx: OperatingContext) => void) => {
+  if (typeof window === 'undefined') return () => {};
+  const listener = (event: Event) => {
+    const detail = (event as CustomEvent<OperatingContext | null>).detail;
+    handler(detail ?? null);
+  };
+  window.addEventListener(OPERATING_CONTEXT_EVENT, listener);
+  return () => window.removeEventListener(OPERATING_CONTEXT_EVENT, listener);
+};
 
 export const readOperatingContext = (): OperatingContext => {
   if (typeof window === 'undefined') return null;
@@ -28,6 +48,7 @@ export const writeOperatingContext = (ctx: OperatingContext) => {
     if (!payload) storage.removeItem(STORAGE_KEY);
     else storage.setItem(STORAGE_KEY, payload);
   });
+  dispatchOperatingContextChange(ctx);
 };
 
 export const ensureBusinessContext = (businessId?: string, businessName?: string): OperatingContext => {

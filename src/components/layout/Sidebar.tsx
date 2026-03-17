@@ -42,14 +42,6 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
   const isOwner = role ? OWNER_ROLES.includes(role as (typeof OWNER_ROLES)[number]) : false;
   const needsBusinessSelection = !isAdmin && !operatingContext?.business_id;
 
-  const roleLabel = (value?: string) => {
-    const upper = (value || '').toUpperCase();
-    if (upper === 'ADMIN') return 'Admin';
-    if (OWNER_ROLES.includes(upper as (typeof OWNER_ROLES)[number])) return 'Dueño de negocio';
-    if (upper === 'LOCAL_OPERATOR') return 'Operador de local';
-    return value || 'Administrador';
-  };
-
   useEffect(() => {
     setOperatingContext(readOperatingContext());
   }, []);
@@ -102,6 +94,7 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
     setOperatingContext(ctx);
     writeOperatingContext(ctx);
     onClose?.();
+    router.refresh();
   };
 
   // Refrescar tier si hay contexto sin tier (ej. cacheado sin plan)
@@ -154,6 +147,7 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
 
     const orderedHrefs = [
       '/', // Inicio
+      '/profile',
       '/pos',
       '/pos/pedidos-activos',
       '/pos/historial',

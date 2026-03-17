@@ -8,7 +8,7 @@ import { toast } from 'react-toastify';
 type StatusValue = 'ALL' | 'CREATED' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'DELIVERED' | 'CANCELLED';
 type OperatingContext =
   | { type: 'event'; event_id?: string; event_name?: string; business_id?: string }
-  | { type: 'business'; business_id?: string }
+  | { type: 'business'; business_id?: string; business_name?: string }
   | null;
 
 type UiOrder = {
@@ -146,7 +146,7 @@ export default function PosPedidosActivosPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const pageSize = 5;
   const [operatingContext] = useState<OperatingContext>(() => readOperatingContext());
   const [eventFilterId] = useState<string | null>(() => {
     const ctx = readOperatingContext();
@@ -277,13 +277,18 @@ export default function PosPedidosActivosPage() {
   const handlePrev = () => setPage((prev) => Math.max(1, prev - 1));
   const handleNext = () => setPage((prev) => Math.min(totalPages, prev + 1));
 
+  const businessLabel =
+    operatingContext?.type === 'business' && operatingContext.business_name
+      ? operatingContext.business_name
+      : businessFilterId;
+
   const contextLabel =
     operatingContext?.type === 'event' && operatingContext.event_name
       ? `Evento: ${operatingContext.event_name}`
       : eventFilterId
       ? `Evento ID: ${eventFilterId}`
-      : businessFilterId
-        ? `Local ID: ${businessFilterId}`
+      : businessLabel
+        ? `Local: ${businessLabel}`
         : 'Modo local';
 
   const handleOpenDetail = (orderId: string) => {

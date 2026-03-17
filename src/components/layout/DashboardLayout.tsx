@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { getCachedUser, logout } from '@/lib/auth';
+import { normalizeRoleLabel } from '@/lib/constants';
 import { useRouter } from 'next/navigation';
 
 interface DashboardLayoutProps {
@@ -15,14 +16,6 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [userRole, setUserRole] = useState<string | undefined>(undefined);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const router = useRouter();
-
-  const roleLabel = (value?: string) => {
-    const upper = (value || '').toUpperCase();
-    if (upper === 'ADMIN') return 'Admin';
-    if (upper === 'LOCAL_OPERATOR') return 'Operador de local';
-    if (upper === 'BUSINESS_OWNER' || upper === 'OWNER') return 'Dueño de negocio';
-    return value || 'Usuario';
-  };
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -65,7 +58,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                 </span>
                 {userRole && (
                   <span className="text-[11px] text-[#8a7560] uppercase font-semibold">
-                    {roleLabel(userRole)}
+                    {normalizeRoleLabel(userRole, 'Usuario')}
                   </span>
                 )}
               </div>
