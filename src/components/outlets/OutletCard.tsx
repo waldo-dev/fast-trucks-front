@@ -19,6 +19,7 @@ interface OutletCardProps {
   onToggleStatus: () => void;
   onViewDetail?: () => void;
   onDelete?: () => void;
+  isDeleteRequesting?: boolean;
 }
 
 export const OutletCard: React.FC<OutletCardProps> = ({
@@ -27,6 +28,7 @@ export const OutletCard: React.FC<OutletCardProps> = ({
   onToggleStatus,
   onViewDetail,
   onDelete,
+  isDeleteRequesting = false,
 }) => {
   const typeColors = {
     Pizzeria: 'bg-primary/10 text-primary',
@@ -91,14 +93,18 @@ export const OutletCard: React.FC<OutletCardProps> = ({
                 Ver detalle
               </button>
               <button
-                className="w-full text-left px-3 py-2 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+                className="w-full text-left px-3 py-2 text-sm bg-red-50 text-red-600 flex items-center gap-2"
+                disabled={isDeleteRequesting}
                 onClick={() => {
+                  if (isDeleteRequesting) return;
                   setMenuOpen(false);
                   onDelete?.();
                 }}
               >
-                <span className="material-symbols-outlined text-[18px]">delete</span>
-                Eliminar
+                <span className="material-symbols-outlined text-[18px]">
+                  {isDeleteRequesting ? 'hourglass_top' : 'delete'}
+                </span>
+                {isDeleteRequesting ? 'Solicitando...' : 'Solicitar eliminación'}
               </button>
             </div>
           )}

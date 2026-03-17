@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { RecentOrdersTable } from '@/components/dashboard/RecentOrdersTable';
-import { TopVenues } from '@/components/dashboard/TopVenues';
 import { businessService, orderService } from '@/lib/services';
 import { toast } from 'react-toastify';
+import { useOperatingContext } from '@/lib/hooks/useOperatingContext';
 
 const formatNumber = (value?: number) =>
   new Intl.NumberFormat('es-CL', { maximumFractionDigits: 0 }).format(value || 0);
@@ -43,24 +43,6 @@ type TopBusinessApi = {
   total_sales?: number;
 };
 
-type OperatingContext =
-  | { type: 'event'; event_id?: string; event_name?: string; business_id?: string }
-  | { type: 'business'; business_id?: string }
-  | null;
-
-const readOperatingContext = (): OperatingContext => {
-  if (typeof window === 'undefined') return null;
-  const raw =
-    localStorage.getItem('business_operating_context') ??
-    sessionStorage.getItem('business_operating_context');
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as OperatingContext;
-  } catch {
-    return null;
-  }
-};
-
 const endOfDayIso = (date: Date) => {
   const d = new Date(date);
   d.setHours(23, 59, 59, 999);
@@ -85,11 +67,7 @@ export default function DashboardHomePage() {
   const [topBusinesses, setTopBusinesses] = useState<TopBusinessApi[]>([]);
   const [ordersContext, setOrdersContext] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [operatingContext, setOperatingContext] = useState<OperatingContext | null>(null);
-
-  useEffect(() => {
-    setOperatingContext(readOperatingContext());
-  }, []);
+  const operatingContext = useOperatingContext();
 
   useEffect(() => {
     const loadData = async () => {
@@ -231,31 +209,19 @@ export default function DashboardHomePage() {
       }));
   }, [ordersContext]);
 
-  const mappedTopVenues = useMemo(() => {
-    const icons = ['local_pizza', 'lunch_dining', 'ramen_dining', 'bakery_dining'];
-    const bgs: Array<'orange' | 'blue' | 'rose' | 'emerald'> = [
-      'orange',
-      'blue',
-      'rose',
-      'emerald',
-    ];
-    return topBusinesses.map((b, idx) => ({
-      name: b.name || `Local ${b.id ?? idx + 1}`,
-      orders: `${formatNumber(b.order_count || 0)} pedidos`,
-      revenue: formatCurrency(Number(b.total_sales) || 0),
-      icon: icons[idx % icons.length],
-      iconBg: bgs[idx % bgs.length],
-    }));
-  }, [topBusinesses]);
-
   return (
-    <div className="flex flex-col gap-6">
+    <div className="relative flex flex-col gap-6">
+      {loading && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-white/75 text-sm font-semibold text-slate-600">
+          Cargando datos...
+        </div>
+      )}
       {/* Context badges */}
       <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
         <span className="px-3 py-1 rounded-full bg-primary/10 text-primary font-semibold">
           {operatingContext?.type === 'event'
             ? `Evento: ${operatingContext?.event_name || operatingContext?.event_id || ''}`
-            : 'Local activo'}
+            : `Local: ${operatingContext?.business_name || ''}`}
         </span>
         <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700">
           Últimos 30 días
@@ -282,10 +248,10 @@ export default function DashboardHomePage() {
               </div>
               {loading && <span className="text-xs text-gray-500">Cargando...</span>}
             </div>
-            <RecentOrdersTable orders={contextRecent} />
+            <RecentOrdersTable orders={mappedRecentOrders} />
           </div>
 
-         {/* <div className="bg-white border border-primary/10 rounded-xl p-4 shadow-sm">
+          {/* <div className="bg-white border border-primary/10 rounded-xl p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h2 className="text-lg font-bold text-[#181411]">Pedidos recientes (global)</h2>
@@ -297,11 +263,11 @@ export default function DashboardHomePage() {
         </div>
 
         <div className="space-y-4">
-          <div className="bg-white border border-primary/10 rounded-xl p-4 shadow-sm">
+          {/*<div className="bg-white border border-primary/10 rounded-xl p-4 shadow-sm">
             <h2 className="text-lg font-bold text-[#181411] mb-1">Top locales</h2>
             <p className="text-sm text-gray-500 mb-3">Ranking global de locales.</p>
-        <TopVenues venues={mappedTopVenues} />
-          </div>
+            <TopVenues venues={mappedTopVenues} />
+          </div>*/}
 
           <div className="bg-white border border-primary/10 rounded-xl p-4 shadow-sm">
             <h2 className="text-lg font-bold text-[#181411] mb-1">Mix de contexto</h2>

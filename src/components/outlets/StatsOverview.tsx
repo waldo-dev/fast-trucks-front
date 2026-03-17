@@ -19,7 +19,7 @@ interface StatsOverviewProps {
 
 export const StatsOverview: React.FC<StatsOverviewProps> = ({ stats }) => {
   return (
-    <div className="mt-12 grid grid-cols-1 md:grid-cols-4 gap-6">
+    <div className="mt-12 grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
       {stats.map((stat, index) => (
         <div
           key={index}

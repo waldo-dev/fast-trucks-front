@@ -41,9 +41,9 @@ export const TopVenues: React.FC<TopVenuesProps> = ({ venues }) => {
             </div>
           </div>
         ))}
-        <button className="w-full py-2.5 mt-2 bg-[#f5f2f0] dark:bg-[#3d3226] text-[#4b5563] dark:text-[#a3907d] text-sm font-bold rounded-lg hover:bg-[#ebe8e5] transition-colors">
+        {/*<button className="w-full py-2.5 mt-2 bg-[#f5f2f0] dark:bg-[#3d3226] text-[#4b5563] dark:text-[#a3907d] text-sm font-bold rounded-lg hover:bg-[#ebe8e5] transition-colors">
           Reporte de Análisis
-        </button>
+        </button>*/}
       </div>
     </div>
   );

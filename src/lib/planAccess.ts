@@ -18,7 +18,7 @@ type FeatureKey =
   | 'inventory_valued';
 
 const FEATURES_BY_TIER: Record<PlanTier, FeatureKey[]> = {
-  BASIC: ['pos', 'cash_shifts', 'kitchen_print', 'discounts'],
+  BASIC: ['pos', 'cash_shifts', 'kitchen_print', 'discounts','inventory_basic',],
   STANDARD: [
     'pos',
     'cash_shifts',
@@ -72,6 +72,8 @@ export const listFeaturesForTier = (tier?: PlanTier): FeatureKey[] => {
   const t = tier ?? getCachedTier();
   return FEATURES_BY_TIER[t] ?? [];
 };
+
+
 
 
 

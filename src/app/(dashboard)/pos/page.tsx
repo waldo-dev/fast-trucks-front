@@ -136,12 +136,12 @@ const CustomerForm = ({
           onChange={(e) =>
             setPaymentMethod(
               e.target.value as
-                | 'CASH'
-                | 'CARD'
-                | 'TRANSFER'
-                | 'WEBPAY'
-                | 'CREDIT_CARD'
-                | 'DEBIT_CARD'
+              | 'CASH'
+              | 'CARD'
+              | 'TRANSFER'
+              | 'WEBPAY'
+              | 'CREDIT_CARD'
+              | 'DEBIT_CARD'
             )
           }
         >
@@ -289,24 +289,24 @@ export default function PosPage() {
     return `${base}/${path}`;
   };
 
-const friendlyOrderError = (err: any) => {
-  const fallback = 'No se pudo crear la orden. Intenta nuevamente.';
-  const message =
-    typeof err === 'string'
-      ? err
-      : (err?.response?.data as any)?.message ||
+  const friendlyOrderError = (err: any) => {
+    const fallback = 'No se pudo crear la orden. Intenta nuevamente.';
+    const message =
+      typeof err === 'string'
+        ? err
+        : (err?.response?.data as any)?.message ||
         (err?.response?.data as any)?.error ||
         err?.message ||
         err?.error;
-  if (typeof message !== 'string') return fallback;
-  const lower = message.toLowerCase();
-  if (lower.includes('stock')) return 'No hay stock suficiente para algún producto.';
-  if (lower.includes('payment')) return 'Hubo un problema con el pago. Intenta con otro medio.';
-  if (lower.includes('event')) return 'No se pudo asociar la orden al evento. Revisa la selección.';
-  if (lower.includes('business') || lower.includes('local'))
-    return 'No se encontró el local para la orden.';
-  return fallback;
-};
+    if (typeof message !== 'string') return fallback;
+    const lower = message.toLowerCase();
+    if (lower.includes('stock')) return 'No hay stock suficiente para algún producto.';
+    if (lower.includes('payment')) return 'Hubo un problema con el pago. Intenta con otro medio.';
+    if (lower.includes('event')) return 'No se pudo asociar la orden al evento. Revisa la selección.';
+    if (lower.includes('business') || lower.includes('local'))
+      return 'No se encontró el local para la orden.';
+    return fallback;
+  };
 
   const canCheckout =
     cart.length > 0 &&
@@ -696,6 +696,7 @@ const friendlyOrderError = (err: any) => {
       try {
         const resp = await cashRegisterService.getActive({ business_id: selectedBusiness });
         const payload = (resp as any)?.data ?? resp;
+        console.log("payload:", payload)
         if (payload?.id) {
           setActiveRegisterId(String(payload.id));
           setActiveRegister(payload);
@@ -735,14 +736,14 @@ const friendlyOrderError = (err: any) => {
                 Punto de venta
               </p>
               <div className="text-xs text-gray-500">
-                {selectedBusiness ? 'Local activo' : 'Sin local seleccionado'}
+                {selectedBusiness ? '' : 'Sin local seleccionado'}
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <span
                 className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-semibold ${activeContext.type === 'event'
-                    ? 'bg-primary/10 text-primary border-primary/30'
-                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  ? 'bg-primary/10 text-primary border-primary/30'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                   }`}
               >
                 <span className="material-symbols-outlined text-sm">
@@ -791,12 +792,12 @@ const friendlyOrderError = (err: any) => {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <button className="hidden sm:inline-flex bg-white border border-primary/20 text-gray-600 p-2 rounded-lg hover:bg-primary/5">
+          {/*<button className="hidden sm:inline-flex bg-white border border-primary/20 text-gray-600 p-2 rounded-lg hover:bg-primary/5">
             <span className="material-symbols-outlined">notifications</span>
           </button>
           <button className="hidden sm:inline-flex bg-white border border-primary/20 text-gray-600 p-2 rounded-lg hover:bg-primary/5">
             <span className="material-symbols-outlined">settings</span>
-          </button>
+          </button>*/}
         </div>
       </header>
 
@@ -810,7 +811,7 @@ const friendlyOrderError = (err: any) => {
                 Caja en POS
               </p>
               <h3 className="text-lg font-bold text-[#181411]">
-                {activeRegister ? `Caja #${activeRegisterId}` : 'Sin caja abierta'}
+                {activeRegister ? `Caja #${activeRegister.code}` : 'Sin caja abierta'}
               </h3>
             </div>
           </div>
@@ -1023,8 +1024,8 @@ const friendlyOrderError = (err: any) => {
               <button
                 key={cat}
                 className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap border ${selectedCategory === cat
-                    ? 'bg-primary text-white border-primary'
-                    : 'bg-white text-gray-700 border-primary/20 hover:bg-primary/5'
+                  ? 'bg-primary text-white border-primary'
+                  : 'bg-white text-gray-700 border-primary/20 hover:bg-primary/5'
                   }`}
                 onClick={() => setSelectedCategory(cat)}
               >
@@ -1190,8 +1191,8 @@ const friendlyOrderError = (err: any) => {
             <div className="flex gap-2">
               <button
                 className={`flex-1 rounded-lg py-3 font-bold transition-colors ${canCheckout
-                    ? 'bg-primary text-white hover:bg-primary/90'
-                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  ? 'bg-primary text-white hover:bg-primary/90'
+                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
                   }`}
                 onClick={handleContinue}
                 disabled={!canCheckout || submittingOrder}

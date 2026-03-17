@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { cashRegisterService, orderService } from '@/lib/services';
 import { getCachedUser } from '@/lib/auth';
+import { getCachedTier } from '@/lib/planAccess';
 import { toast } from 'react-toastify';
 
 type OperatingContext =
@@ -165,6 +166,16 @@ export default function PosCierreCajaPage() {
     }
   };
 
+  const tier = useMemo(() => getCachedTier(), []);
+  const isBasicPlan = tier === 'BASIC';
+  const canUseMultipleRegisters = tier !== 'BASIC';
+
+  useEffect(() => {
+    if (!canUseMultipleRegisters && allowMultiple) {
+      setAllowMultiple(false);
+    }
+  }, [allowMultiple, canUseMultipleRegisters]);
+
   const handleOpenRegister = async () => {
     if (!businessId) {
       toast.error('No hay negocio seleccionado para abrir caja.');
@@ -290,7 +301,7 @@ export default function PosCierreCajaPage() {
           <div className="flex flex-wrap gap-2 md:justify-end">
             <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#f5f2f0] text-[#8a7560] dark:bg-[#241c14] dark:text-[#d2b29b]">
               {activeRegister
-                ? `Caja activa #${activeRegister.id}`
+                ? `Caja activa #${activeRegister.code}`
                 : businessId
                 ? 'Sin caja abierta'
                 : 'Sin negocio seleccionado'}
@@ -328,7 +339,7 @@ export default function PosCierreCajaPage() {
                   ) : activeRegister ? (
                     <div className="space-y-1 text-sm text-[#181411] dark:text-white">
                       <p>
-                        <span className="font-semibold">ID:</span> {activeRegister.id}
+                        <span className="font-semibold">N° Caja:</span> {activeRegister.code}
                       </p>
                       <p>
                         <span className="font-semibold">Apertura:</span>{' '}
@@ -367,38 +378,49 @@ export default function PosCierreCajaPage() {
                 </div>
               </div>
 
-              <div className="border border-primary/10 dark:border-[#3d3226] rounded-lg p-3 space-y-2">
-                <div className="flex items-center justify-between">
+              {isBasicPlan && activeRegister ? (
+                <div className="border border-primary/10 dark:border-[#3d3226] rounded-lg p-3 space-y-2">
                   <div className="text-sm font-semibold text-[#181411] dark:text-white">Abrir caja</div>
-                  <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Ya hay una caja abierta. Cierra la caja actual antes de abrir una nueva.
+                  </p>
+                </div>
+              ) : (
+                <div className="border border-primary/10 dark:border-[#3d3226] rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-semibold text-[#181411] dark:text-white">Abrir caja</div>
+                    {canUseMultipleRegisters && (
+                      <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                        <input
+                          type="checkbox"
+                          className="accent-primary"
+                          checked={allowMultiple}
+                          onChange={(e) => setAllowMultiple(e.target.checked)}
+                        />
+                        Múltiples abiertas
+                      </label>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr,140px] gap-2">
                     <input
-                      type="checkbox"
-                      className="accent-primary"
-                      checked={allowMultiple}
-                      onChange={(e) => setAllowMultiple(e.target.checked)}
+                      type="number"
+                      min={0}
+                      step="100"
+                      value={openingAmount}
+                      onChange={(e) => setOpeningAmount(Number(e.target.value))}
+                      className="h-10 px-3 rounded-lg border border-primary/20 bg-white dark:bg-[#1f1a13] text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                      placeholder="Monto de apertura"
                     />
-                    Múltiples abiertas
-                  </label>
+                    <button
+                      onClick={handleOpenRegister}
+                      disabled={loadingRegister || !businessId}
+                      className="h-10 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-60"
+                    >
+                      {loadingRegister ? 'Procesando...' : 'Abrir caja'}
+                    </button>
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-[1fr,140px] gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    step="100"
-                    value={openingAmount}
-                    onChange={(e) => setOpeningAmount(Number(e.target.value))}
-                    className="h-10 px-3 rounded-lg border border-primary/20 bg-white dark:bg-[#1f1a13] text-sm focus:ring-2 focus:ring-primary/20 outline-none"
-                    placeholder="Monto de apertura"
-                  />
-                  <button
-                    onClick={handleOpenRegister}
-                    disabled={loadingRegister || !businessId}
-                    className="h-10 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-60"
-                  >
-                    {loadingRegister ? 'Procesando...' : 'Abrir caja'}
-                  </button>
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -476,7 +498,7 @@ export default function PosCierreCajaPage() {
               <button
                 onClick={handleAddMovement}
                 disabled={loadingRegister || !activeRegister}
-                className="h-10 rounded-lg bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-500 disabled:opacity-60"
+                className="h-10 rounded-lg bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-500 disabled:opacity-60 p-2"
               >
                 {loadingRegister ? 'Procesando...' : 'Agregar movimiento'}
               </button>

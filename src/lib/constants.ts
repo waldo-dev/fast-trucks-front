@@ -7,6 +7,11 @@ export const SIDEBAR_ITEMS = [
     icon: 'home',
   },
   {
+    title: 'Perfil',
+    href: '/profile',
+    icon: 'person',
+  },
+  {
     title: 'Locales',
     href: '/outlets',
     icon: 'storefront',
@@ -100,6 +105,11 @@ export const ADMIN_SIDEBAR_ITEMS = [
     href: '/admin/configuracion',
     icon: 'settings',
   },
+  {
+    title: 'Perfil',
+    href: '/profile',
+    icon: 'person',
+  },
 ] as const;
 
 export const ADMIN_USERS_SIDEBAR_ITEM = {
@@ -140,7 +150,24 @@ export const OPERATOR_SIDEBAR_ITEMS = [
     href: '/pos/cambiar-evento',
     icon: 'event_repeat',
   },
+  {
+    title: 'Perfil',
+    href: '/profile',
+    icon: 'person',
+  },
 ] as const;
 
 export const OWNER_ROLES = ['OWNER', 'BUSINESS_OWNER', 'OWNER_BUSINESS'] as const;
+
+export const normalizeRoleLabel = (value?: string, fallback = 'Sin rol'): string => {
+  const trimmed = value?.trim();
+  if (!trimmed) return fallback;
+
+  const upper = trimmed.toUpperCase();
+  if (upper === 'ADMIN') return 'Admin';
+  if (OWNER_ROLES.includes(upper as (typeof OWNER_ROLES)[number])) return 'Dueño de negocio';
+  if (upper === 'LOCAL_OPERATOR') return 'Operador de local';
+
+  return trimmed;
+};
 

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { businessService, userService } from '@/lib/services';
 import { toast } from 'react-toastify';
 import { getCachedUser } from '@/lib/auth';
-import { OWNER_ROLES } from '@/lib/constants';
+import { normalizeRoleLabel } from '@/lib/constants';
 
 const friendlyUserError = (err: any, fallback: string) => {
   const msg =
@@ -60,7 +60,7 @@ export const UsersView = ({ scope }: UsersViewProps) => {
   const [editingUser, setEditingUser] = useState<NormalizedUser | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [page, setPage] = useState(1);
-  const pageSize = 15;
+  const pageSize = 5;
   const [form, setForm] = useState<{
     name: string;
     email: string;
@@ -79,13 +79,7 @@ export const UsersView = ({ scope }: UsersViewProps) => {
 
   const cachedRole = getCachedUser()?.role?.toUpperCase();
   const cachedBusinessId = getCachedUser()?.businessId;
-  const roleLabel = (role?: string) => {
-    const r = (role || '').toUpperCase();
-    if (r === 'ADMIN') return 'Admin';
-    if (OWNER_ROLES.includes(r as (typeof OWNER_ROLES)[number])) return 'Dueño de negocio';
-    if (r === 'LOCAL_OPERATOR') return 'Operador de local';
-    return role || 'N/A';
-  };
+  const roleLabel = (role?: string) => normalizeRoleLabel(role, 'N/A');
   const scopeCopy =
     scope === 'admin'
       ? 'Verás todos los usuarios de todos los locales y cuentas.'

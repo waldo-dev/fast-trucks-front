@@ -39,6 +39,8 @@ export default function OutletsPage() {
     secondary_color: '',
     logo: null as File | null,
   });
+  const [deletionRequestingId, setDeletionRequestingId] = useState<number | null>(null);
+  const [deletionMessage, setDeletionMessage] = useState<string | null>(null);
 
   const outletsCount = outletsData.length;
   const subtitle =
@@ -77,20 +79,20 @@ export default function OutletsPage() {
         bgColor: 'bg-primary/5',
       },
     },
-    {
-      icon: 'groups',
-      iconBg: 'bg-blue-100',
-      iconColor: 'text-blue-600',
-      label: 'Personal en Turno',
-      value: '18/22',
-    },
-    {
-      icon: 'schedule',
-      iconBg: 'bg-orange-100',
-      iconColor: 'text-orange-600',
-      label: 'Tiempo Prom. Preparación',
-      value: '14.5m',
-    },
+    //{
+    //  icon: 'groups',
+    //  iconBg: 'bg-blue-100',
+    //  iconColor: 'text-blue-600',
+    //  label: 'Personal en Turno',
+    //  value: '18/22',
+    //},
+    //{
+    //  icon: 'schedule',
+    //  iconBg: 'bg-orange-100',
+    //  iconColor: 'text-orange-600',
+    //  label: 'Tiempo Prom. Preparación',
+    //  value: '14.5m',
+    //},
   ];
 
   const presetColors = [
@@ -141,16 +143,16 @@ export default function OutletsPage() {
   };
 
   const handleDelete = async (id: number) => {
-    const outlet = outletsData.find((o) => o.id === id);
-    const confirmDelete = window.confirm(
-      `¿Eliminar el local "${outlet?.name || id}"? Esta acción es irreversible.`
-    );
-    if (!confirmDelete) return;
+    setDeletionMessage(null);
+    setDeletionRequestingId(id);
     try {
-      await businessService.remove(id);
-      await loadOutlets();
-    } catch (error) {
-      console.error(error);
+      // Placeholder: en el futuro debe disparar un webhook a n8n para iniciar el flujo de eliminación.
+      console.log('Solicitando eliminación en n8n para local', id);
+      setDeletionMessage(
+        'Solicitud enviada. Pronto se activará el flujo n8n para procesar la baja.'
+      );
+    } finally {
+      setDeletionRequestingId(null);
     }
   };
 
@@ -253,7 +255,7 @@ export default function OutletsPage() {
       <div className="flex flex-wrap justify-between items-end gap-4 mb-8">
         <div className="flex flex-col gap-1">
           <h1 className="text-[#181411] text-4xl font-extrabold tracking-tight">
-            Gestionar Locales de Comida
+            Gestionar Mis Locales
           </h1>
           <p className="text-[#8a7560] text-lg font-medium">{subtitle}</p>
         </div>
@@ -270,7 +272,13 @@ export default function OutletsPage() {
             <span>Agregar Nuevo Local</span>
           </button>
         </div>
+        {deletionMessage && (
+          <p className="text-sm text-emerald-600 mt-2">{deletionMessage}</p>
+        )}
       </div>
+
+      {/* Stats Overview Summary */}
+      <StatsOverview stats={stats} />
 
       {/* Tabs Section */}
       <OutletTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
@@ -303,13 +311,11 @@ export default function OutletsPage() {
               onToggleStatus={() => handleToggleStatus(outlet.id)}
               onViewDetail={() => handleViewDetail(outlet.id)}
               onDelete={() => handleDelete(outlet.id)}
+              isDeleteRequesting={deletionRequestingId === outlet.id}
             />
           ))}
         <AddOutletCard onClick={handleAddOutlet} />
       </div>
-
-      {/* Stats Overview Summary */}
-      <StatsOverview stats={stats} />
 
       {showModal && (
         <div
