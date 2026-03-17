@@ -2,27 +2,9 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import {
-  SIDEBAR_ITEMS,
-  ADMIN_SIDEBAR_ITEMS,
-  OPERATOR_SIDEBAR_ITEMS,
-  USERS_SIDEBAR_ITEM,
-  ADMIN_USERS_SIDEBAR_ITEM,
-  INVENTORY_SIDEBAR_ITEM,
-  OWNER_ROLES,
-  APP_NAME,
-} from '@/lib/constants';
-import { getCurrentUser, getCachedUser, logout } from '@/lib/auth';
-import { hasFeature, normalizeTier } from '@/lib/planAccess';
-import { readOperatingContext, writeOperatingContext } from '@/lib/operatingContext';
-import { businessService, subscriptionService } from '@/lib/services';
-
-type OperatingContext =
-  | { type: 'event'; event_id?: string; event_name?: string; business_id?: string }
-  | { type: 'business'; business_id?: string }
-  | null;
+import { usePathname } from 'next/navigation';
+import { APP_NAME } from '@/lib/constants';
+import { useDashboardNavigation } from './useDashboardNavigation';
 
 interface SidebarProps {
   isMobileOpen?: boolean;
@@ -31,173 +13,16 @@ interface SidebarProps {
 
 export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
   const pathname = usePathname();
-  const router = useRouter();
-  const [user, setUser] = useState<Awaited<ReturnType<typeof getCurrentUser>>>(getCachedUser());
-  const [operatingContext, setOperatingContext] = useState<OperatingContext>(() => readOperatingContext());
-  const [businesses, setBusinesses] = useState<Array<{ id: string; name: string; tier?: string }>>([]);
-  const [loadingBiz, setLoadingBiz] = useState(false);
-  const role = user?.role?.toUpperCase();
-  const isAdmin = role === 'ADMIN';
-  const isOperator = role === 'LOCAL_OPERATOR';
-  const isOwner = role ? OWNER_ROLES.includes(role as (typeof OWNER_ROLES)[number]) : false;
-  const needsBusinessSelection = !isAdmin && !operatingContext?.business_id;
-
-  useEffect(() => {
-    setOperatingContext(readOperatingContext());
-  }, []);
-
-  useEffect(() => {
-    const loadBiz = async () => {
-      setLoadingBiz(true);
-      try {
-        const resp = await businessService.list();
-        const list = (resp as any)?.data ?? resp;
-        if (Array.isArray(list)) {
-          setBusinesses(
-            list.map((b: any) => ({
-              id: String(b.id),
-              name: b.name || b.brand_name || `Negocio ${b.id}`,
-            }))
-          );
-        }
-      } catch {
-        // silencio
-      } finally {
-        setLoadingBiz(false);
-      }
-    };
-    loadBiz();
-  }, [operatingContext]);
-
-  const handleSelectBusiness = async (id: string) => {
-    const selected = businesses.find((b) => b.id === id);
-    const ctx: OperatingContext = {
-      type: 'business',
-      business_id: id,
-    };
-    if ((operatingContext as any)?.planTier) {
-      (ctx as any).planTier = (operatingContext as any).planTier;
-    }
-    if (selected?.name) {
-      (ctx as any).business_name = selected.name;
-    }
-    // Buscar suscripción activa para tier
-    try {
-      const resp = await subscriptionService.list({ business_id: id, status: 'ACTIVE' } as any);
-      const data = (resp as any)?.data ?? resp;
-      const sub = Array.isArray(data) ? data[0] : null;
-      const tier = normalizeTier(sub?.plan?.name ?? sub?.plan_id);
-      if (tier) (ctx as any).planTier = tier;
-    } catch {
-      // silencio
-    }
-    setOperatingContext(ctx);
-    writeOperatingContext(ctx);
-    onClose?.();
-    router.refresh();
-  };
-
-  // Refrescar tier si hay contexto sin tier (ej. cacheado sin plan)
-  useEffect(() => {
-    if (!operatingContext || operatingContext.type !== 'business' || (operatingContext as any).planTier) return;
-    if (!operatingContext.business_id) return;
-    handleSelectBusiness(operatingContext.business_id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [operatingContext?.business_id]);
-
-  const contextAwareOperatorItems = OPERATOR_SIDEBAR_ITEMS.map((item) => {
-    if (item.href !== '/pos/cambiar-evento') return item;
-    const title = operatingContext?.type === 'event' ? 'Cambiar Local' : 'Cambiar Evento';
-    return { ...item, title };
-  });
-
-  type SidebarItem = { title: string; href: string; icon: string };
-
-  const resolveOwnerItems = (): SidebarItem[] => {
-    const featureByHref: Record<string, Parameters<typeof hasFeature>[0]> = {
-      '/inventory': 'inventory_basic',
-      '/products': 'inventory_basic',
-      '/customers': 'crm',
-      '/orders': 'reports',
-      '/pos/historial': 'reports',
-      '/outlets': 'multi_registers',
-      '/events/analytics': 'reports',
-      // '/mailing': 'crm', // no se limita de momento
-    };
-
-    const byHref = (href: string): SidebarItem | undefined => {
-      const item = [
-        ...contextAwareOperatorItems,
-        ...SIDEBAR_ITEMS,
-        USERS_SIDEBAR_ITEM,
-        INVENTORY_SIDEBAR_ITEM,
-      ].find((i) => i.href === href);
-
-      if (!item) return undefined;
-      const feature = featureByHref[href];
-      const tierFromCtx = (operatingContext as any)?.planTier;
-      // Si aún no conocemos el plan (p.ej. al primer login sin contexto), no filtramos.
-      if (!tierFromCtx && feature) {
-        return item;
-      }
-      const effectiveTier = tierFromCtx || 'BASIC';
-      if (feature && !hasFeature(feature, effectiveTier as any)) return undefined;
-      return item;
-    };
-
-    const orderedHrefs = [
-      '/', // Inicio
-      '/profile',
-      '/pos',
-      '/pos/pedidos-activos',
-      '/pos/historial',
-      '/pos/cierre-caja',
-      '/pos/cambiar-evento',
-      '/orders',
-      '/customers',
-      '/products',
-      '/promotions',
-      '/events',
-      '/events/analytics',
-      '/outlets',
-      '/mailing',
-      '/inventory',
-      '/users',
-    ];
-
-    const seen = new Set<string>();
-    const ordered = orderedHrefs.reduce<SidebarItem[]>((acc, href) => {
-      const item = byHref(href);
-      if (!item || seen.has(href)) return acc;
-      seen.add(href);
-      acc.push(item);
-      return acc;
-    }, []);
-
-    return ordered;
-  };
-
-  const sidebarItems = isAdmin
-    ? [...ADMIN_SIDEBAR_ITEMS, ADMIN_USERS_SIDEBAR_ITEM]
-    : isOperator
-    ? contextAwareOperatorItems
-    : isOwner
-    ? resolveOwnerItems()
-    : SIDEBAR_ITEMS;
-
-  useEffect(() => {
-    let active = true;
-    getCurrentUser()
-      .then((data) => {
-        if (active) setUser(data || getCachedUser());
-      })
-      .catch(() => {
-        if (active) setUser(getCachedUser());
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const {
+    sidebarItems,
+    businesses,
+    loadingBiz,
+    needsBusinessSelection,
+    operatingContext,
+    handleSelectBusiness,
+    isAdmin,
+    isOperator,
+  } = useDashboardNavigation();
 
   return (
     <>
@@ -246,7 +71,7 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
       <aside
         className={`fixed lg:static inset-y-0 left-0 z-40 transform transition-transform duration-200 lg:translate-x-0 ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
-        } w-72 lg:w-64 flex-shrink-0 border-r border-[#e6e0db] bg-white dark:bg-[#2d2419] h-screen lg:min-h-screen flex flex-col`}
+        } w-72 lg:w-64 flex-shrink-0 border-r border-[#e6e0db] bg-white dark:bg-[#2d2419] h-screen max-h-screen min-h-0 lg:min-h-screen flex flex-col`}
       >
         <div className="p-6 flex flex-col gap-3 border-b border-[#f5f2f0]">
           <div className="flex items-center">
@@ -269,7 +94,7 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
                 value={
                   operatingContext?.type === 'business' ? operatingContext.business_id : ''
                 }
-                onChange={(e) => handleSelectBusiness(e.target.value)}
+                onChange={(e) => handleSelectBusiness(e.target.value, onClose)}
                 className="h-9 rounded-lg border border-[#e6e0db] bg-white dark:bg-[#2d2419] dark:border-[#3d3226] px-2 text-sm"
                 disabled={loadingBiz}
               >
@@ -286,7 +111,7 @@ export const Sidebar = ({ isMobileOpen = false, onClose }: SidebarProps) => {
           )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
+        <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 flex flex-col gap-2">
           {sidebarItems.map((item) => {
             const isActive =
               pathname === item.href ||
