@@ -183,11 +183,11 @@ export const useDashboardNavigation = (): UseDashboardNavigationResult => {
     }, []);
   }, [contextAwareOperatorItems, operatingContext]);
 
-  const sidebarItems = useMemo(() => {
+  const sidebarItems = useMemo<SidebarItem[]>(() => {
     if (isAdmin) return [...ADMIN_SIDEBAR_ITEMS, ADMIN_USERS_SIDEBAR_ITEM];
     if (isOperator) return contextAwareOperatorItems;
     if (isOwner) return resolveOwnerItems;
-    return SIDEBAR_ITEMS;
+    return [...SIDEBAR_ITEMS];
   }, [isAdmin, isOperator, isOwner, contextAwareOperatorItems, resolveOwnerItems]);
 
   return {
