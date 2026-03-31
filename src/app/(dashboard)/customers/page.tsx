@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { CustomerStats } from '@/components/customers/CustomerStats';
 import { CustomerTable } from '@/components/customers/CustomerTable';
 import { businessService, customerService } from '@/lib/services';
-import { readOperatingContext } from '@/lib/operatingContext';
+import { readOperatingContext, watchOperatingContext } from '@/lib/operatingContext';
 import { orderService } from '@/lib/services';
 import { getAccessToken, getCachedUser } from '@/lib/auth';
 import { toast } from 'react-toastify';
@@ -52,6 +51,7 @@ export default function CustomersPage() {
   const [page, setPage] = useState(1);
   const pageSize = 10;
   const [customerOrders, setCustomerOrders] = useState<Record<number, any[]>>({});
+  const [search, setSearch] = useState('');
 
   const initialsFromName = (name?: string) => {
     if (!name) return 'NN';
@@ -205,16 +205,27 @@ export default function CustomersPage() {
         });
         setBusinessNames(dict);
         setBusinessOptions(opts);
-        if (!selectedBusinessId && opts.length) {
-          const cached = getCachedUser()?.businessId;
-          const found = cached ? opts.find((o) => o.id === String(cached)) : undefined;
-          setSelectedBusinessId(found?.id || opts[0].id);
+        if (opts.length) {
+          setSelectedBusinessId((prev) => {
+            if (prev && opts.some((o) => o.id === prev)) return prev;
+            const ctx = readOperatingContext();
+            const ctxId =
+              ctx?.type === 'business'
+                ? ctx.business_id
+                : ctx?.type === 'event'
+                  ? ctx.business_id
+                  : undefined;
+            if (ctxId && opts.some((o) => o.id === String(ctxId))) return String(ctxId);
+            const cached = getCachedUser()?.businessId;
+            const found = cached ? opts.find((o) => o.id === String(cached)) : undefined;
+            return found?.id || opts[0].id;
+          });
         }
       }
     } catch {
       // silencioso, usamos fallback de id
     }
-  }, [selectedBusinessId]);
+  }, []);
 
   useEffect(() => {
     fetchCustomers();
@@ -222,44 +233,21 @@ export default function CustomersPage() {
   }, [fetchCustomers, fetchBusinessNames]);
 
   useEffect(() => {
-    setPage(1);
-  }, [customers]);
+    const unsub = watchOperatingContext((ctx) => {
+      const bid =
+        ctx?.type === 'business'
+          ? ctx.business_id
+          : ctx?.type === 'event'
+            ? ctx.business_id
+            : undefined;
+      if (bid) setSelectedBusinessId(String(bid));
+    });
+    return unsub;
+  }, []);
 
-  const stats = useMemo(
-    () => [
-      {
-        icon: 'group',
-        iconBg: 'bg-primary/10',
-        iconColor: 'text-primary',
-        label: 'Total Clientes',
-        value: new Intl.NumberFormat('es-CL').format(customers.length),
-        change: '',
-        changeColor: 'text-[#07880e]',
-        changeBg: 'bg-green-50',
-      },
-      {
-        icon: 'shopping_cart',
-        iconBg: 'bg-blue-50',
-        iconColor: 'text-blue-600',
-        label: 'Activos Esta Semana',
-        value: '—',
-        change: '',
-        changeColor: 'text-[#07880e]',
-        changeBg: 'bg-green-50',
-      },
-      {
-        icon: 'repeat',
-        iconBg: 'bg-orange-50',
-        iconColor: 'text-orange-600',
-        label: 'Frecuencia Promedio',
-        value: '—',
-        change: '',
-        changeColor: 'text-red-500',
-        changeBg: 'bg-red-50',
-      },
-    ],
-    [customers.length]
-  );
+  useEffect(() => {
+    setPage(1);
+  }, [customers, search]);
 
   const handleToggleExpand = (id: number) => {
     setExpandedCustomer(expandedCustomer === id ? null : id);
@@ -306,6 +294,16 @@ export default function CustomersPage() {
   };
 
   const handleNewCustomer = () => {
+    const ctx = readOperatingContext();
+    const bid =
+      ctx?.type === 'business'
+        ? ctx.business_id
+        : ctx?.type === 'event'
+          ? ctx.business_id
+          : undefined;
+    if (bid && businessOptions.some((o) => o.id === String(bid))) {
+      setSelectedBusinessId(String(bid));
+    }
     setIsModalOpen(true);
   };
 
@@ -378,36 +376,42 @@ export default function CustomersPage() {
     recentOrders: customerOrders[customer.id]?.slice(0, 5).map(mapOrderCard),
   }));
 
-  const totalPages = Math.max(1, Math.ceil(customersWithExpanded.length / pageSize));
+  const filteredCustomers = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return customersWithExpanded;
+    return customersWithExpanded.filter(
+      (c) =>
+        c.name.toLowerCase().includes(term) ||
+        c.email.toLowerCase().includes(term) ||
+        c.phone.toLowerCase().includes(term)
+    );
+  }, [customersWithExpanded, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / pageSize));
   const currentPage = Math.min(page, totalPages);
 
   const paginatedCustomers = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return customersWithExpanded.slice(start, start + pageSize);
-  }, [customersWithExpanded, currentPage]);
+    return filteredCustomers.slice(start, start + pageSize);
+  }, [filteredCustomers, currentPage]);
 
   const handlePrev = () => setPage((prev) => Math.max(1, prev - 1));
   const handleNext = () => setPage((prev) => Math.min(totalPages, prev + 1));
 
   return (
     <div className="flex-1 flex flex-col p-6 lg:p-10 gap-8 overflow-y-auto">
-      {/* Breadcrumbs */}
-      <div className="flex items-center gap-2 text-sm">
-        <a className="text-[#8a7560] hover:text-primary transition-colors" href="#">
-          Admin
-        </a>
-        <span className="material-symbols-outlined text-xs text-[#8a7560]">chevron_right</span>
-        <span className="text-[#181411] font-medium">Directorio de Clientes</span>
-      </div>
-
       {/* Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-[#181411] text-3xl font-black tracking-tight">
-            Directorio de Clientes
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a7560] mb-1">
+            Clientes
+          </p>
+          <h2 className="text-[#181411] dark:text-white text-3xl font-black tracking-tight">
+            Tu base de clientes
           </h2>
-          <p className="text-[#8a7560] text-base mt-1">
-            Gestiona y relaciona con 1,284 clientes en todos los food trucks y locales.
+          <p className="text-[#8a7560] text-base mt-1 max-w-xl">
+            Lista, crea nuevos contactos y exporta. El local activo del navbar se usa al crear un
+            cliente.
           </p>
         </div>
         <div className="flex gap-3">
@@ -429,8 +433,18 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {/* Summary Metric Cards */}
-      <CustomerStats stats={stats} />
+      <div className="relative max-w-md">
+        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#8a7560]">
+          search
+        </span>
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por nombre, correo o teléfono…"
+          className="w-full h-11 pl-10 pr-4 rounded-xl border border-[#e6e0db] bg-white dark:bg-[#2d2419] dark:border-[#3d3226] text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+        />
+      </div>
 
       {/* Main CRM Table Card */}
       {error && (
@@ -442,9 +456,11 @@ export default function CustomersPage() {
         <div className="bg-white border border-primary/10 rounded-lg px-4 py-3 text-sm text-[#8a7560]">
           Cargando clientes...
         </div>
-      ) : customersWithExpanded.length === 0 ? (
+      ) : filteredCustomers.length === 0 ? (
         <div className="bg-white border border-primary/10 rounded-lg px-4 py-3 text-sm text-[#8a7560]">
-          No hay clientes para mostrar.
+          {customersWithExpanded.length === 0
+            ? 'No hay clientes para mostrar.'
+            : 'Ningún cliente coincide con la búsqueda.'}
         </div>
       ) : (
         <div className="bg-white border border-primary/10 rounded-lg">
@@ -509,14 +525,14 @@ export default function CustomersPage() {
         <p className="text-sm text-[#8a7560] font-medium text-center sm:text-left">
           Mostrando{' '}
           <span className="text-[#181411]">
-            {customersWithExpanded.length === 0
+            {filteredCustomers.length === 0
               ? 0
               : (currentPage - 1) * pageSize + 1}
-            {customersWithExpanded.length > 0
-              ? `-${Math.min(currentPage * pageSize, customersWithExpanded.length)}`
+            {filteredCustomers.length > 0
+              ? `-${Math.min(currentPage * pageSize, filteredCustomers.length)}`
               : ''}
           </span>{' '}
-          de <span className="text-[#181411]">{customersWithExpanded.length}</span> clientes
+          de <span className="text-[#181411]">{filteredCustomers.length}</span> clientes
         </p>
         <div className="flex items-center gap-2 justify-center sm:justify-end">
           <button
@@ -596,9 +612,8 @@ export default function CustomersPage() {
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-sm font-semibold text-[#181411]">
-                  Correo
+                  Correo (opcional)
                   <input
-                    required
                     type="email"
                     value={newCustomer.email}
                     onChange={(e) =>

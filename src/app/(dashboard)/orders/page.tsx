@@ -2,206 +2,365 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { StatusFilterCards } from '@/components/orders/StatusFilterCards';
-import { OrderTable } from '@/components/orders/OrderTable';
-import { StatsFooter } from '@/components/orders/StatsFooter';
-import { orderService } from '@/lib/services';
-import { getAccessToken, getCachedUser } from '@/lib/auth';
+import Link from 'next/link';
+import { businessService, customerService, eventService, orderService } from '@/lib/services';
+import { readOperatingContext, watchOperatingContext } from '@/lib/operatingContext';
+import { getCachedUser } from '@/lib/auth';
 import { toast } from 'react-toastify';
-import { config } from '@/lib/config';
-
-type ApiOrder = {
-  id?: string | number;
-  code?: string | number;
-  external_id?: string | number;
-  status?: string;
-  order_type?: string;
-  type?: string;
-  total?: number | string;
-  customer?: {
-    name?: string;
-    phone?: string;
-    initials?: string;
-  };
-  business?: {
-    name?: string;
-  };
-  business_name?: string;
-  created_at?: string;
-  createdAt?: string;
-  time?: string;
-};
-
-type OrdersByBusiness = {
-  business_id?: string | number;
-  business_name?: string;
-  orders?: ApiOrder[];
-};
 
 type UiOrder = {
-  id: string; // id mostrado (code o id)
-  backendId: string; // id real para API
-  time: string;
-  venue: string;
-  customer: {
-    initials: string;
-    name: string;
-  };
-  type: 'Delivery' | 'Pickup';
-  status: 'new' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
-  total: string;
-  isDelivered?: boolean;
+  id: string;
+  code: string;
+  status: string;
+  type: string;
+  source: string;
+  sourceLabel: string;
+  contextLabel: string;
+  contextType: 'event' | 'business';
+  eventLabel: string;
+  eventId?: string;
+  customerName: string;
+  total: number;
+  createdAt: string;
+  businessName: string;
 };
 
-const formatCurrency = (value?: string | number) => {
-  const numeric = Number(value);
-  if (Number.isNaN(numeric)) return '$0';
-  return new Intl.NumberFormat('es-CL', {
+const STATUS_OPTIONS = [
+  'CREATED',
+  'CONFIRMED',
+  'PREPARING',
+  'READY',
+  'DELIVERED',
+  'CANCELLED',
+];
+
+type ContextFilter = 'ALL' | 'EVENT' | 'LOCAL';
+
+const formatClp = (value: number) =>
+  new Intl.NumberFormat('es-CL', {
     style: 'currency',
     currency: 'CLP',
     maximumFractionDigits: 0,
-  }).format(numeric);
-};
+  }).format(value || 0);
 
-const formatDateTime = (value?: string) => {
+const formatDate = (value?: string) => {
   if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('es-CL', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(date);
-};
-
-const initialsFromName = (name?: string) => {
-  if (!name) return 'NN';
-  const parts = name.trim().split(' ');
-  const [first, second] = parts;
-  return `${first?.[0] ?? ''}${second?.[0] ?? ''}`.toUpperCase() || 'NN';
-};
-
-const mapStatus = (status?: string): UiOrder['status'] => {
-  const normalized = (status || '').toString().toUpperCase();
-  switch (normalized) {
-    case 'CREATED':
-    case 'NEW':
-      return 'new';
-    case 'CONFIRMED':
-    case 'PREPARING':
-      return 'preparing';
-    case 'READY':
-      return 'ready';
-    case 'DELIVERED':
-      return 'delivered';
-    case 'CANCELLED':
-      return 'cancelled';
-    default:
-      return 'new';
+  try {
+    return new Intl.DateTimeFormat('es-CL', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(new Date(value));
+  } catch {
+    return value;
   }
 };
 
-const mapType = (type?: string): UiOrder['type'] => {
-  const normalized = (type || '').toString().toUpperCase();
-  return normalized === 'DELIVERY' ? 'Delivery' : 'Pickup';
+const formatInputDateTimeLocal = (date: Date) => {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const y = date.getFullYear();
+  const m = pad(date.getMonth() + 1);
+  const d = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const mm = pad(date.getMinutes());
+  return `${y}-${m}-${d}T${hh}:${mm}`;
+};
+
+const todayRangeLocal = () => {
+  const now = new Date();
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(now);
+  end.setHours(23, 59, 59, 999);
+  return {
+    start: formatInputDateTimeLocal(start),
+    end: formatInputDateTimeLocal(end),
+  };
+};
+
+const csvEscape = (v: string | number) => {
+  const s = String(v ?? '');
+  return `"${s.replace(/"/g, '""')}"`;
 };
 
 export default function OrdersPage() {
   const router = useRouter();
-  const [activeFilter, setActiveFilter] = useState<UiOrder['status'] | 'all'>('all');
-  const [ordersByBusiness, setOrdersByBusiness] = useState<OrdersByBusiness[]>([]);
+  const [businesses, setBusinesses] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedBusiness, setSelectedBusiness] = useState<string>(
+    () => readOperatingContext()?.business_id ?? getCachedUser()?.businessId ?? ''
+  );
+  const [events, setEvents] = useState<Array<{ id: string; name: string }>>([]);
+  const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
+  const [orders, setOrders] = useState<UiOrder[]>([]);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [status, setStatus] = useState('');
+  const [contextFilter, setContextFilter] = useState<ContextFilter>('ALL');
+  const [eventId, setEventId] = useState('');
+  const [customerId, setCustomerId] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [exporting, setExporting] = useState(false);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const pageSize = 15;
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    const user = getCachedUser();
-    if (!user?.id) {
-      setError('No se encontró el usuario en sesión');
-      setOrdersByBusiness([]);
-      setLoading(false);
+  const loadBusinesses = useCallback(async () => {
+    try {
+      const resp = await businessService.list();
+      const list = (resp as any)?.data ?? resp;
+      if (Array.isArray(list)) {
+        const mapped = list.map((b: any) => ({
+          id: String(b.id),
+          name: b.name || b.brand_name || `Local ${b.id}`,
+        }));
+        setBusinesses(mapped);
+        if (!selectedBusiness && mapped.length) {
+          const ctx = readOperatingContext();
+          const contextBiz = ctx?.business_id
+            ? mapped.find((b) => b.id === String(ctx.business_id))
+            : undefined;
+          const cached = getCachedUser()?.businessId;
+          const found = cached ? mapped.find((b) => b.id === String(cached)) : undefined;
+          setSelectedBusiness(contextBiz?.id || found?.id || mapped[0].id);
+        }
+      } else {
+        setBusinesses([]);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'No se pudieron cargar los locales';
+      setBusinesses([]);
+      toast.error(msg);
+    }
+  }, [selectedBusiness]);
+
+  const loadEvents = useCallback(async () => {
+    const biz = selectedBusiness || readOperatingContext()?.business_id;
+    try {
+      const params: Record<string, string | boolean> = {};
+      if (biz) params.business_id = biz;
+      const resp = await eventService.list(params as any);
+      const list = (resp as any)?.data ?? resp;
+      if (Array.isArray(list)) {
+        setEvents(
+          list.map((ev: any) => ({
+            id: String(ev.id),
+            name: ev.event_date ? `${ev.name || 'Evento'} · ${ev.event_date}` : ev.name || 'Evento',
+          }))
+        );
+      } else {
+        setEvents([]);
+      }
+    } catch {
+      setEvents([]);
+    }
+  }, [selectedBusiness]);
+
+  const loadCustomers = useCallback(async (businessId?: string) => {
+    if (!businessId) {
+      setCustomers([]);
       return;
     }
-
     try {
-      const resp = await orderService.listByUser(user.id);
-      const data = (resp as any)?.data ?? resp;
-      if (Array.isArray(data)) {
-        setOrdersByBusiness(data as OrdersByBusiness[]);
+      const resp = await customerService.list({ business_id: businessId } as any);
+      const list = (resp as any)?.data ?? resp;
+      if (Array.isArray(list)) {
+        setCustomers(
+          list.map((c: any) => ({
+            id: String(c.id),
+            name: c.name || c.email || c.phone || `Cliente ${c.id}`,
+          }))
+        );
       } else {
-        setOrdersByBusiness([]);
+        setCustomers([]);
       }
-      setLastUpdated(new Date());
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'No se pudieron cargar los pedidos';
-      setError(msg);
-      toast.error(msg);
-      setOrdersByBusiness([]);
-    } finally {
-      setLoading(false);
+    } catch {
+      setCustomers([]);
+    }
+  }, []);
+
+  const fetchOrders = useCallback(
+    async (override?: { start?: string; end?: string }) => {
+      if (!selectedBusiness) {
+        setOrders([]);
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      const start = override?.start ?? startDate;
+      const end = override?.end ?? endDate;
+      const params: Record<string, string | number> = { business_id: selectedBusiness };
+      if (start) params.start_date = new Date(start).toISOString();
+      if (end) params.end_date = new Date(end).toISOString();
+      if (status) params.status = status;
+      if (contextFilter === 'EVENT') {
+        if (eventId) (params as any).event_id = eventId;
+        else (params as any).order_source = 'EVENT';
+      }
+      if (customerId) params.customer_id = customerId;
+
+      try {
+        const resp = await orderService.history(params);
+        const data = (resp as any)?.data ?? resp;
+        if (Array.isArray(data)) {
+          const mapped: UiOrder[] = data.map((o: any, idx: number) => ({
+            id: String(o.id ?? idx + 1),
+            code: o.code || o.external_id || `ORD-${o.id ?? idx + 1}`,
+            status: (o.status || 'CREATED').toString().toUpperCase(),
+            type: (o.order_type || o.type || 'PICKUP').toString().toUpperCase(),
+            source: (o.order_source || o.source || 'POS').toString().toUpperCase(),
+            sourceLabel: (() => {
+              const src = (o.order_source || o.source || 'POS').toString().toUpperCase();
+              if (src === 'WHATSAPP') return 'WhatsApp';
+              if (src === 'WEB') return 'Web';
+              if (src === 'APP') return 'App';
+              return 'POS';
+            })(),
+            contextType: o.event || o.has_event ? 'event' : 'business',
+            contextLabel: o.event
+              ? `Evento: ${o.event.name || 'Evento'}`
+              : o.has_event
+                ? 'Evento'
+                : 'Local',
+            eventId: o.event?.id
+              ? String(o.event.id)
+              : o.event_id
+                ? String(o.event_id)
+                : undefined,
+            eventLabel: o.event
+              ? `${o.event.name || 'Evento'}${o.event.event_date ? ` · ${o.event.event_date}` : ''}`
+              : o.has_event
+                ? o.event_id
+                  ? `Evento #${o.event_id}`
+                  : 'Evento'
+                : '—',
+            customerName: o.customer?.name || 'Sin nombre',
+            total: Number(o.total) || 0,
+            createdAt: o.created_at || o.createdAt || '',
+            businessName: o.business?.name || o.business_name || `Local ${selectedBusiness}`,
+          }));
+          setOrders(mapped);
+        } else {
+          setOrders([]);
+        }
+      } catch (err) {
+        const msg =
+          err instanceof Error ? err.message : 'No se pudo cargar el historial de pedidos';
+        setError(msg);
+        toast.error(msg);
+        setOrders([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [selectedBusiness, startDate, endDate, status, contextFilter, eventId, customerId]
+  );
+
+  useEffect(() => {
+    loadBusinesses();
+  }, [loadBusinesses]);
+
+  useEffect(() => {
+    const ctx = readOperatingContext();
+    if (ctx?.type === 'event' && ctx.event_id) {
+      setContextFilter('EVENT');
+      setEventId(String(ctx.event_id));
     }
   }, []);
 
   useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
-
-  const normalizedOrders = useMemo<UiOrder[]>(() => {
-    return ordersByBusiness.flatMap((group) => {
-      const venueName = group.business_name ? `Local ${group.business_name}` : 'Local sin nombre';
-      return (group.orders || []).map((order, idx) => {
-        const status = mapStatus(order.status);
-        const backendId =
-          order.id ??
-          order.code ??
-          order.external_id ??
-          `ORD-${group.business_id ?? 'N'}-${idx + 1}`;
-        const displayId =
-          order.code ??
-          order.id ??
-          order.external_id ??
-          `ORD-${group.business_id ?? 'N'}-${idx + 1}`;
-        const customerName = order.customer?.name || 'Cliente';
-        return {
-          id: String(displayId),
-          backendId: String(backendId),
-          time: formatDateTime(order.created_at || order.createdAt || order.time),
-          venue: order.business?.name || order.business_name || venueName,
-          customer: {
-            initials: order.customer?.initials || initialsFromName(customerName),
-            name: customerName,
-          },
-          type: mapType(order.order_type || order.type),
-          status,
-          total: formatCurrency(order.total),
-          isDelivered: status === 'delivered',
-        };
-      });
+    const unsub = watchOperatingContext((ctx) => {
+      const bid =
+        ctx?.type === 'business'
+          ? ctx.business_id
+          : ctx?.type === 'event'
+            ? ctx.business_id
+            : undefined;
+      if (bid) setSelectedBusiness(String(bid));
+      if (ctx?.type === 'event' && ctx.event_id) {
+        setContextFilter('EVENT');
+        setEventId(String(ctx.event_id));
+      }
     });
-  }, [ordersByBusiness]);
+    return unsub;
+  }, []);
 
-  const filteredOrders = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return normalizedOrders.filter((order) => {
-      const matchesStatus = activeFilter === 'all' ? true : order.status === activeFilter;
-      const matchesSearch =
-        !term ||
-        order.id.toLowerCase().includes(term) ||
-        order.customer.name.toLowerCase().includes(term) ||
-        order.venue.toLowerCase().includes(term);
-      return matchesStatus && matchesSearch;
-    });
-  }, [normalizedOrders, activeFilter, search]);
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
+
+  useEffect(() => {
+    loadCustomers(selectedBusiness);
+  }, [selectedBusiness, loadCustomers]);
+
+  useEffect(() => {
+    if (contextFilter === 'LOCAL') {
+      setEventId('');
+    }
+  }, [contextFilter]);
+
+  useEffect(() => {
+    if (!selectedBusiness || startDate || endDate) return;
+    const { start, end } = todayRangeLocal();
+    setStartDate(start);
+    setEndDate(end);
+    fetchOrders({ start, end });
+  }, [selectedBusiness, startDate, endDate, fetchOrders]);
 
   useEffect(() => {
     setPage(1);
-  }, [activeFilter, search, normalizedOrders]);
+  }, [
+    selectedBusiness,
+    startDate,
+    endDate,
+    status,
+    contextFilter,
+    eventId,
+    customerId,
+    search,
+    orders,
+  ]);
+
+  const statusLabel = (value: string) => {
+    switch (value) {
+      case 'CREATED':
+        return 'Creado';
+      case 'CONFIRMED':
+        return 'Confirmado';
+      case 'PREPARING':
+        return 'Preparando';
+      case 'READY':
+        return 'Listo';
+      case 'DELIVERED':
+        return 'Entregado';
+      case 'CANCELLED':
+        return 'Cancelado';
+      default:
+        return value;
+    }
+  };
+
+  const filteredOrders = useMemo(() => {
+    let list = orders.filter((o) => {
+      if (contextFilter === 'EVENT') {
+        if (eventId) return o.contextType === 'event' && o.eventId === eventId;
+        return o.contextType === 'event';
+      }
+      if (contextFilter === 'LOCAL') {
+        return o.contextType === 'business';
+      }
+      return true;
+    });
+    const term = search.trim().toLowerCase();
+    if (term) {
+      list = list.filter(
+        (o) =>
+          o.code.toLowerCase().includes(term) ||
+          o.customerName.toLowerCase().includes(term) ||
+          o.businessName.toLowerCase().includes(term) ||
+          o.eventLabel.toLowerCase().includes(term)
+      );
+    }
+    return list;
+  }, [orders, contextFilter, eventId, search]);
 
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -213,335 +372,382 @@ export default function OrdersPage() {
 
   const handlePrev = () => setPage((prev) => Math.max(1, prev - 1));
   const handleNext = () => setPage((prev) => Math.min(totalPages, prev + 1));
-
-  const statusCounts = useMemo(() => {
-    return normalizedOrders.reduce(
-      (acc, order) => {
-        acc.all += 1;
-        acc[order.status] += 1;
-        return acc;
-      },
-      { all: 0, new: 0, preparing: 0, ready: 0, delivered: 0, cancelled: 0 }
-    );
-  }, [normalizedOrders]);
-
-  const statusFilters = [
-    {
-      label: 'Todos los Pedidos',
-      count: statusCounts.all,
-      color: '',
-      isActive: activeFilter === 'all',
-      change: undefined,
-      onClick: () => setActiveFilter('all'),
-    },
-    {
-      label: 'Nuevo',
-      count: statusCounts.new,
-      color: 'bg-yellow-400',
-      isActive: activeFilter === 'new',
-      onClick: () => setActiveFilter('new'),
-    },
-    {
-      label: 'Preparando',
-      count: statusCounts.preparing,
-      color: 'bg-primary',
-      isActive: activeFilter === 'preparing',
-      onClick: () => setActiveFilter('preparing'),
-    },
-    {
-      label: 'Listo',
-      count: statusCounts.ready,
-      color: 'bg-green-500',
-      isActive: activeFilter === 'ready',
-      onClick: () => setActiveFilter('ready'),
-    },
-    {
-      label: 'Entregado',
-      count: statusCounts.delivered,
-      color: 'bg-gray-400',
-      isActive: activeFilter === 'delivered',
-      onClick: () => setActiveFilter('delivered'),
-    },
-  ];
-
-  const lastUpdatedLabel = useMemo(() => {
-    if (!lastUpdated) return '—';
-    const diffMs = Date.now() - lastUpdated.getTime();
-    const diffSec = Math.max(1, Math.round(diffMs / 1000));
-    if (diffSec < 60) return `${diffSec}s`;
-    const diffMin = Math.round(diffSec / 60);
-    if (diffMin < 60) return `${diffMin}m`;
-    const diffHours = Math.round(diffMin / 60);
-    return `${diffHours}h`;
-  }, [lastUpdated]);
-
-  const handleUpdateStatus = useCallback(
-    async (orderId: string, nextStatus: string) => {
-      try {
-        setUpdatingId(orderId);
-        const payload = { status: nextStatus };
-        await toast.promise(orderService.updateStatus(orderId, payload), {
-          pending: 'Actualizando estado...',
-          success: 'Estado actualizado',
-          error: 'No se pudo actualizar el estado',
-        });
-        fetchOrders();
-      } catch (err) {
-        const msg =
-          err instanceof Error ? err.message : 'No se pudo actualizar el estado del pedido';
-        toast.error(msg);
-      } finally {
-        setUpdatingId(null);
-      }
-    },
-    [fetchOrders]
-  );
-
-  const handleViewDetails = (orderId: string) => {
-    if (!orderId) return;
+  const openOrder = (orderId: string) =>
     router.push(`/pos/pedidos-activos/${encodeURIComponent(orderId)}`);
-  };
 
-  const handleExport = async () => {
-    const user = getCachedUser();
-    const token = getAccessToken();
-    if (!user?.id || !token) {
-      toast.error('No se encontró sesión activa para exportar.');
+  const handleExportCsv = () => {
+    if (!filteredOrders.length) {
+      toast.info('No hay filas para exportar.');
       return;
     }
-    try {
-      setExporting(true);
-      const url = `${config.api.baseUrl}orders/by-user/${user.id}/csv`;
-      const resp = await fetch(url, {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!resp.ok) {
-        throw new Error(`No se pudo exportar (${resp.status})`);
-      }
-      const blob = await resp.blob();
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `orders-${user.id}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(link.href);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'No se pudo exportar CSV';
-      toast.error(msg);
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const handleManualOrder = () => {
-    router.push('/pos');
+    const header = [
+      'Codigo',
+      'Local',
+      'Contexto',
+      'Evento',
+      'Cliente',
+      'Canal',
+      'Tipo',
+      'Estado',
+      'Total',
+      'Fecha',
+    ];
+    const rows = filteredOrders.map((o) =>
+      [
+        csvEscape(o.code),
+        csvEscape(o.businessName),
+        csvEscape(o.contextLabel),
+        csvEscape(o.eventLabel),
+        csvEscape(o.customerName),
+        csvEscape(o.sourceLabel),
+        csvEscape(o.type === 'DELIVERY' ? 'Delivery' : 'Retiro'),
+        csvEscape(statusLabel(o.status)),
+        csvEscape(o.total),
+        csvEscape(formatDate(o.createdAt)),
+      ].join(',')
+    );
+    const csv = [header.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `pedidos-${selectedBusiness || 'export'}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(link.href);
+    toast.success('CSV descargado');
   };
 
   return (
-    <div className="flex flex-col flex-1 max-w-[1440px] mx-auto w-full px-4 md:px-10 py-8">
-      {/* Page Title & Main Action */}
-      <div className="flex flex-wrap justify-between items-end gap-4 mb-8">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-[#181411] text-4xl font-black leading-tight tracking-tight">
-            Pedidos Operativos
+    <div className="flex flex-col gap-6 max-w-[1440px] mx-auto w-full px-4 md:px-10 py-8">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div className="space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a7560]">Pedidos</p>
+          <h1 className="text-3xl md:text-4xl font-black text-[#181411] dark:text-white leading-tight">
+            Histórico y análisis
           </h1>
-          <p className="text-[#8a7560] text-base font-normal">
-            Monitorea y gestiona el tráfico en tiempo real en tus locales activos.
+          <p className="text-[#8a7560] text-base max-w-2xl">
+            Consulta pedidos pasados con filtros por fecha, estado, local y evento. Las operaciones en
+            tiempo real están en{' '}
+            <Link href="/pos" className="font-semibold text-primary hover:underline">
+              Ventas
+            </Link>
+            .
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-2">
           <button
-            onClick={handleExport}
-            className="flex items-center gap-2 px-5 h-11 bg-white border border-[#e6e0db] rounded-xl text-[#181411] text-sm font-bold hover:bg-[#f5f2f0] transition-all shadow-sm"
-            disabled={loading || exporting}
+            type="button"
+            onClick={handleExportCsv}
+            disabled={loading || !filteredOrders.length}
+            className="inline-flex items-center gap-2 px-4 h-11 bg-white border border-[#e6e0db] rounded-xl text-[#181411] text-sm font-bold hover:bg-[#f5f2f0] disabled:opacity-50"
           >
-            <span className="material-symbols-outlined text-xl">download</span>
-            {exporting ? 'Exportando...' : 'Exportar CSV'}
+            <span className="material-symbols-outlined text-lg">download</span>
+            Exportar CSV
           </button>
-          <button
-            onClick={handleManualOrder}
-            className="flex items-center gap-2 px-6 h-11 bg-primary rounded-xl text-white text-sm font-bold hover:brightness-110 transition-all shadow-lg shadow-primary/20"
-            disabled={loading}
+          <Link
+            href="/pos"
+            className="inline-flex items-center gap-2 px-5 h-11 bg-primary rounded-xl text-white text-sm font-bold hover:brightness-110 shadow-lg shadow-primary/20"
           >
-            <span className="material-symbols-outlined text-xl">add</span>
-            Pedido Manual
-          </button>
+            <span className="material-symbols-outlined text-lg">add</span>
+            Nuevo pedido
+          </Link>
         </div>
       </div>
 
-      {/* Status Filter Cards */}
-      <StatusFilterCards filters={statusFilters} />
-
-      {/* Table Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-t-2xl border border-[#e6e0db] border-b-0">
-        <div className="flex items-center gap-3 flex-1 min-w-[300px]">
-          <div className="relative flex-1 max-w-md">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#8a7560]">
-              search
-            </span>
+      <div className="bg-white dark:bg-[#2d2419] border border-[#e6e0db] dark:border-[#3d3226] rounded-xl p-4 shadow-sm space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <div className="md:col-span-2 flex flex-col gap-1">
+            <span className="text-xs font-semibold text-[#8a7560]">Local</span>
+            <select
+              className="h-11 px-3 rounded-lg border border-primary/20 bg-white text-sm focus:ring-2 focus:ring-primary/20 outline-none dark:bg-[#2d2419] dark:border-[#3d3226]"
+              value={selectedBusiness}
+              onChange={(e) => setSelectedBusiness(e.target.value)}
+            >
+              <option value="">Selecciona un local</option>
+              {businesses.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-[#8a7560]">Inicio</span>
             <input
-              className="w-full pl-10 pr-4 py-2 bg-[#f5f2f0] border-none rounded-lg text-sm focus:ring-2 focus:ring-primary/20"
-              placeholder="Buscar por ID de Pedido, Cliente o Local..."
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              disabled={loading}
+              type="datetime-local"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="h-11 px-3 rounded-lg border border-primary/20 bg-white text-sm focus:ring-2 focus:ring-primary/20 outline-none dark:bg-[#2d2419] dark:border-[#3d3226]"
             />
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 border border-[#e6e0db] rounded-lg text-sm font-semibold hover:bg-[#f5f2f0]">
-            <span className="material-symbols-outlined text-lg">filter_list</span>
-            Filtrar
-          </button>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-[#8a7560]">Fin</span>
+            <input
+              type="datetime-local"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="h-11 px-3 rounded-lg border border-primary/20 bg-white text-sm focus:ring-2 focus:ring-primary/20 outline-none dark:bg-[#2d2419] dark:border-[#3d3226]"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-[#8a7560]">Estado</span>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="h-11 px-3 rounded-lg border border-primary/20 bg-white text-sm focus:ring-2 focus:ring-primary/20 outline-none dark:bg-[#2d2419] dark:border-[#3d3226]"
+            >
+              <option value="">Todos</option>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {statusLabel(s)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-[#8a7560]">Contexto</span>
+            <select
+              value={contextFilter}
+              onChange={(e) => setContextFilter(e.target.value as ContextFilter)}
+              className="h-11 px-3 rounded-lg border border-primary/20 bg-white text-sm focus:ring-2 focus:ring-primary/20 outline-none dark:bg-[#2d2419] dark:border-[#3d3226]"
+            >
+              <option value="ALL">Todos</option>
+              <option value="EVENT">Eventos</option>
+              <option value="LOCAL">Locales</option>
+            </select>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <p className="text-sm text-[#8a7560] font-medium mr-2">
-            Actualizado hace {lastUpdatedLabel}
-          </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-[#8a7560]">Cliente (opcional)</span>
+            <select
+              value={customerId}
+              onChange={(e) => setCustomerId(e.target.value)}
+              className="h-11 px-3 rounded-lg border border-primary/20 bg-white text-sm focus:ring-2 focus:ring-primary/20 outline-none dark:bg-[#2d2419] dark:border-[#3d3226]"
+              disabled={!customers.length}
+            >
+              <option value="">{customers.length ? 'Todos' : 'Sin clientes'}</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-[#8a7560]">Evento (opcional)</span>
+            <select
+              value={eventId}
+              onChange={(e) => setEventId(e.target.value)}
+              className="h-11 px-3 rounded-lg border border-primary/20 bg-white text-sm focus:ring-2 focus:ring-primary/20 outline-none dark:bg-[#2d2419] dark:border-[#3d3226]"
+              disabled={contextFilter === 'LOCAL' || !events.length}
+            >
+              <option value="">
+                {contextFilter === 'LOCAL'
+                  ? 'No aplica en locales'
+                  : events.length
+                    ? 'Todos o elige uno'
+                    : 'Sin eventos'}
+              </option>
+              {events.map((ev) => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 md:col-span-1">
+            <span className="text-xs font-semibold text-[#8a7560]">Buscar en resultados</span>
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#8a7560] text-lg">
+                search
+              </span>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Código, cliente, local, evento…"
+                className="w-full h-11 pl-10 pr-3 rounded-lg border border-primary/20 bg-white text-sm focus:ring-2 focus:ring-primary/20 outline-none dark:bg-[#2d2419] dark:border-[#3d3226]"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            className="size-9 flex items-center justify-center rounded-lg bg-[#f5f2f0] text-primary disabled:opacity-50"
-            onClick={fetchOrders}
-            disabled={loading}
+            type="button"
+            onClick={() => fetchOrders()}
+            disabled={loading || !selectedBusiness}
+            className="px-4 h-11 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-60"
           >
-            <span className="material-symbols-outlined text-xl">refresh</span>
+            {loading ? 'Cargando...' : 'Aplicar filtros'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setStartDate('');
+              setEndDate('');
+              setStatus('');
+              setContextFilter('ALL');
+              setEventId('');
+              setCustomerId('');
+              setSearch('');
+            }}
+            disabled={loading}
+            className="px-4 h-11 rounded-lg border border-primary/20 text-sm font-semibold text-[#181411] hover:bg-primary/5 disabled:opacity-60"
+          >
+            Limpiar
           </button>
         </div>
       </div>
 
-      {/* Table Container */}
       {error && (
-        <div className="w-full bg-red-50 text-red-700 border border-red-200 rounded-b-2xl px-4 py-3">
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
           {error}
         </div>
       )}
-      {loading ? (
-        <div className="w-full bg-white border border-[#e6e0db] border-t-0 rounded-b-2xl px-6 py-8 text-sm text-[#8a7560]">
-          Cargando pedidos...
+
+      {loading && !filteredOrders.length ? (
+        <div className="bg-white border border-primary/10 rounded-xl p-4 text-sm text-[#8a7560]">
+          Cargando pedidos…
         </div>
       ) : filteredOrders.length === 0 ? (
-        <div className="w-full bg-white border border-[#e6e0db] border-t-0 rounded-b-2xl px-6 py-8 text-sm text-[#8a7560]">
-          No hay pedidos para mostrar.
+        <div className="bg-white border border-primary/10 rounded-xl p-4 text-sm text-[#8a7560]">
+          {selectedBusiness
+            ? 'No hay pedidos para los filtros seleccionados.'
+            : 'Selecciona un local y aplica filtros.'}
         </div>
       ) : (
-        <div className="w-full bg-white border border-[#e6e0db] border-t-0 rounded-b-2xl">
-          {/* Escritorio: tabla */}
-          <div className="hidden md:block">
-            <OrderTable
-              orders={paginatedOrders}
-              onViewDetails={handleViewDetails}
-              onUpdateStatus={handleUpdateStatus}
-              updatingId={updatingId}
-            />
+        <div className="bg-white border border-primary/10 rounded-xl shadow-sm dark:bg-[#2d2419] dark:border-[#3d3226]">
+          <div className="hidden md:block overflow-x-auto">
+            <table className="min-w-full text-left">
+              <thead className="bg-primary/5 text-[#8a7560] text-xs font-bold uppercase tracking-wider">
+                <tr>
+                  <th className="px-4 py-3">Pedido</th>
+                  <th className="px-4 py-3">Local</th>
+                  <th className="px-4 py-3">Contexto</th>
+                  <th className="px-4 py-3">Evento</th>
+                  <th className="px-4 py-3">Cliente</th>
+                  <th className="px-4 py-3">Canal</th>
+                  <th className="px-4 py-3">Tipo</th>
+                  <th className="px-4 py-3">Estado</th>
+                  <th className="px-4 py-3">Total</th>
+                  <th className="px-4 py-3">Fecha</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-primary/10 text-sm text-[#181411] dark:text-white">
+                {paginatedOrders.map((o) => (
+                  <tr
+                    key={o.id}
+                    className="hover:bg-primary/5 cursor-pointer"
+                    onClick={() => openOrder(o.id)}
+                  >
+                    <td className="px-4 py-3 font-semibold">#{o.code}</td>
+                    <td className="px-4 py-3">{o.businessName}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
+                          o.contextType === 'event'
+                            ? 'bg-primary/10 text-primary border border-primary/20'
+                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-sm">
+                          {o.contextType === 'event' ? 'event' : 'store'}
+                        </span>
+                        {o.contextLabel}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">{o.eventLabel}</td>
+                    <td className="px-4 py-3">{o.customerName}</td>
+                    <td className="px-4 py-3">{o.sourceLabel}</td>
+                    <td className="px-4 py-3">{o.type === 'DELIVERY' ? 'Delivery' : 'Retiro'}</td>
+                    <td className="px-4 py-3">
+                      <span className="px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase">
+                        {statusLabel(o.status)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-bold">{formatClp(o.total)}</td>
+                    <td className="px-4 py-3 text-[#8a7560]">{formatDate(o.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
 
-          {/* Mobile: tarjetas */}
-          <div className="md:hidden divide-y divide-[#f0eae4]">
-            {paginatedOrders.map((order) => {
-              return <div
-                key={order.id}
+          <div className="md:hidden divide-y divide-primary/10">
+            {paginatedOrders.map((o) => (
+              <div
+                key={o.id}
                 className="px-4 py-3 space-y-2 cursor-pointer active:scale-[0.99] transition"
-                onClick={() => handleViewDetails(order.backendId)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleViewDetails(order.backendId);
-                }}
+                onClick={() => openOrder(o.id)}
+                onKeyDown={(e) => e.key === 'Enter' && openOrder(o.id)}
                 tabIndex={0}
                 role="button"
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-semibold text-[#181411]">#{order.id}</p>
-                    <p className="text-xs text-[#8a7560]">{order.time}</p>
+                    <p className="font-semibold text-[#181411] dark:text-white">#{o.code}</p>
+                    <p className="text-xs text-[#8a7560]">{formatDate(o.createdAt)}</p>
                   </div>
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${
-                      order.status === 'ready'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : order.status === 'preparing'
-                          ? 'bg-primary/10 text-primary'
-                          : order.status === 'delivered'
-                            ? 'bg-slate-200 text-slate-700'
-                            : order.status === 'cancelled'
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-yellow-100 text-yellow-800'
-                    }`}
-                  >
-                    {order.status === 'ready'
-                      ? 'Listo'
-                      : order.status === 'preparing'
-                        ? 'Preparando'
-                        : order.status === 'delivered'
-                          ? 'Entregado'
-                          : order.status === 'cancelled'
-                            ? 'Cancelado'
-                            : 'Nuevo'}
+                  <span className="px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase">
+                    {statusLabel(o.status)}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <span
-                    className={`px-2 py-1 rounded-full font-semibold ${
-                      order.type === 'Delivery'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-emerald-100 text-emerald-800'
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full font-semibold ${
+                      o.contextType === 'event'
+                        ? 'bg-primary/10 text-primary border border-primary/20'
+                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                     }`}
                   >
-                    {order.type}
+                    {o.contextLabel}
                   </span>
-                  <span className="px-2 py-1 rounded-full bg-primary/10 text-primary font-semibold">
-                    {order.venue}
-                  </span>
+                  {o.eventLabel !== '—' && (
+                    <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-700 font-semibold">
+                      {o.eventLabel}
+                    </span>
+                  )}
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
-                    {order.customer.initials}
-                  </div>
-                  <div className="text-sm text-[#181411]">
-                    <p className="font-semibold">{order.customer.name}</p>
-                    <p className="text-xs text-[#8a7560]">{order.total}</p>
-                  </div>
-                </div>
-              </div>;
-            })}
+                <p className="text-sm font-semibold text-[#181411] dark:text-white">{o.customerName}</p>
+                <p className="text-base font-bold text-[#181411] dark:text-white">{formatClp(o.total)}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 pb-4 pt-2">
+            <p className="text-sm text-[#8a7560]">
+              Mostrando{' '}
+              {filteredOrders.length === 0
+                ? 0
+                : `${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, filteredOrders.length)}`}{' '}
+              de {filteredOrders.length}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handlePrev}
+                disabled={currentPage === 1}
+                className="px-3 py-2 text-sm font-semibold rounded-lg border border-primary/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/5"
+              >
+                Anterior
+              </button>
+              <span className="text-sm text-[#8a7560]">
+                Página {currentPage} de {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={currentPage === totalPages}
+                className="px-3 py-2 text-sm font-semibold rounded-lg border border-primary/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/5"
+              >
+                Siguiente
+              </button>
+            </div>
           </div>
         </div>
       )}
-
-      {/* Pagination */}
-      <div className="flex items-center justify-between py-6 px-4">
-        <p className="text-sm text-[#8a7560] font-medium">
-          Mostrando{' '}
-          <span className="text-[#181411]">
-            {filteredOrders.length === 0
-              ? 0
-              : (currentPage - 1) * pageSize + 1}
-            {filteredOrders.length > 0 ? `-${Math.min(currentPage * pageSize, filteredOrders.length)}` : ''}
-          </span>{' '}
-          de <span className="text-[#181411]">{filteredOrders.length}</span> pedidos
-        </p>
-        <div className="flex gap-2">
-          <button
-            className="px-4 py-2 border border-[#e6e0db] rounded-lg text-sm font-bold bg-white text-[#181411] hover:bg-[#f5f2f0] disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={handlePrev}
-            disabled={currentPage === 1}
-          >
-            Anterior
-          </button>
-          <span className="text-sm text-[#8a7560] font-medium">
-            Página {currentPage} de {totalPages}
-          </span>
-          <button
-            className="px-4 py-2 border border-[#e6e0db] rounded-lg text-sm font-bold bg-white text-[#181411] hover:bg-[#f5f2f0] disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={handleNext}
-            disabled={currentPage === totalPages}
-          >
-            Siguiente
-          </button>
-        </div>
-      </div>
-
-      {/* Stats Footer */}
-      {/*<StatsFooter />*/}
     </div>
   );
 }
-
