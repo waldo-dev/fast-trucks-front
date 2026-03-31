@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 // import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { getCachedUser, logout } from '@/lib/auth';
 import { normalizeRoleLabel } from '@/lib/constants';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useOperatingContext } from '@/lib/hooks/useOperatingContext';
+import { businessService } from '@/lib/services';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -16,12 +18,49 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [userRole, setUserRole] = useState<string | undefined>(undefined);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
+  const operatingContext = useOperatingContext();
 
   useEffect(() => {
     const user = getCachedUser();
     setUserName(user?.name);
     setUserRole(user?.role);
   }, []);
+
+  const normalizedRole = useMemo(() => (userRole ? String(userRole).toUpperCase() : undefined), [userRole]);
+  const shouldEnforceOnboarding = useMemo(() => {
+    if (!normalizedRole) return true;
+    if (normalizedRole === 'ADMIN') return false;
+    if (normalizedRole === 'LOCAL_OPERATOR') return false;
+    return true;
+  }, [normalizedRole]);
+
+  useEffect(() => {
+    if (!shouldEnforceOnboarding) return;
+    const businessId = operatingContext?.type === 'business' ? operatingContext.business_id : undefined;
+    if (!businessId) return;
+    if (!pathname) return;
+    if (pathname.startsWith('/menu/onboarding')) return;
+
+    let active = true;
+    const run = async () => {
+      try {
+        const resp = await businessService.get(businessId);
+        const data = (resp as any)?.data ?? resp;
+        const status = data?.status ? String(data.status).toUpperCase() : undefined;
+        if (!active) return;
+        if (status === 'ONBOARDING') {
+          router.replace('/menu/onboarding');
+        }
+      } catch {
+        // silencio: si no podemos leer status, no forzamos redirect
+      }
+    };
+    run();
+    return () => {
+      active = false;
+    };
+  }, [shouldEnforceOnboarding, operatingContext, pathname, router]);
 
   const userRoleLabel = userRole ? normalizeRoleLabel(userRole, 'Usuario') : undefined;
 

@@ -22,6 +22,11 @@ export const SIDEBAR_ITEMS = [
     icon: 'restaurant',
   },
   {
+    title: 'Menú',
+    href: '/menu',
+    icon: 'menu_book',
+  },
+  {
     title: 'Promociones',
     href: '/promotions',
     icon: 'local_activity',

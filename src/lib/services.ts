@@ -88,6 +88,25 @@ export const businessService = {
   },
 };
 
+export const menuUploadService = {
+  upload: (businessId: string | number, payload: {
+    menu_csv?: string;
+    menu_csv_file?: File | Blob | null;
+    menu_file?: File | Blob | null;
+    finalize?: boolean;
+  }) => {
+    const form = new FormData();
+    if (payload.menu_csv) form.append('menu_csv', payload.menu_csv);
+    if (payload.menu_csv_file) form.append('menu_csv_file', payload.menu_csv_file);
+    if (payload.menu_file) form.append('menu_file', payload.menu_file);
+    if (payload.finalize !== undefined) form.append('finalize', String(payload.finalize));
+    return api.postForm(`business/${businessId}/menu`, form, { auth: true });
+  },
+  setStatus: (businessId: string | number, status: 'ONBOARDING' | 'ACTIVE') => {
+    return api.post(`business/${businessId}/menu/status`, { status }, { auth: true });
+  },
+};
+
 export const planService = {
   list: () => api.get("plans", { auth: true }),
   get: (id: string | number) => api.get(`plans/${id}`, { auth: true }),
