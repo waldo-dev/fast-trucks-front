@@ -107,6 +107,28 @@ export const menuUploadService = {
   },
 };
 
+/** Rutas públicas (sin token) para plantillas y recursos similares */
+export const publicMenuService = {
+  downloadMenuTemplate: async () => {
+    const url = `${config.api.baseUrl}public/menu/template`;
+    const resp = await fetch(url, {
+      method: "GET",
+      headers: { Accept: "text/csv, text/plain, */*" },
+    });
+    if (!resp.ok) {
+      throw new Error(`No se pudo descargar la plantilla (${resp.status})`);
+    }
+    const blob = await resp.blob();
+    const disposition = resp.headers.get("Content-Disposition");
+    const match =
+      /filename\*?=(?:UTF-8'')?["']?([^;"'\n]+)/i.exec(disposition ?? "") ||
+      /filename=["']?([^;"'\n]+)/i.exec(disposition ?? "");
+    const raw = match?.[1]?.replace(/["']/g, "").trim();
+    const filename = raw || "plantilla-menu.csv";
+    return { blob, filename };
+  },
+};
+
 export const planService = {
   list: () => api.get("plans", { auth: true }),
   get: (id: string | number) => api.get(`plans/${id}`, { auth: true }),

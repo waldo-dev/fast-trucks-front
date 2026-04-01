@@ -427,12 +427,7 @@ export default function OrdersPage() {
             Histórico y análisis
           </h1>
           <p className="text-[#8a7560] text-base max-w-2xl">
-            Consulta pedidos pasados con filtros por fecha, estado, local y evento. Las operaciones en
-            tiempo real están en{' '}
-            <Link href="/pos" className="font-semibold text-primary hover:underline">
-              Ventas
-            </Link>
-            .
+            Consulta pedidos pasados con filtros por fecha, estado, local y evento.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -445,13 +440,6 @@ export default function OrdersPage() {
             <span className="material-symbols-outlined text-lg">download</span>
             Exportar CSV
           </button>
-          <Link
-            href="/pos"
-            className="inline-flex items-center gap-2 px-5 h-11 bg-primary rounded-xl text-white text-sm font-bold hover:brightness-110 shadow-lg shadow-primary/20"
-          >
-            <span className="material-symbols-outlined text-lg">add</span>
-            Nuevo pedido
-          </Link>
         </div>
       </div>
 

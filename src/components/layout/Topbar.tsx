@@ -27,7 +27,7 @@ export const Topbar = ({ userName, userRoleLabel, onRequestLogout }: TopbarProps
     isAdmin,
   } = useDashboardNavigation();
   const activeBusinessId =
-    operatingContext?.type === 'business' ? operatingContext.business_id ?? '' : '';
+    operatingContext?.business_id ? String(operatingContext.business_id) : '';
   const activeEventId =
     operatingContext?.type === 'event' ? operatingContext.event_id ?? '' : '';
 
@@ -145,34 +145,38 @@ export const Topbar = ({ userName, userRoleLabel, onRequestLogout }: TopbarProps
               </div>
             )}
 
-            <nav
-              className={`flex flex-nowrap gap-1.5 overflow-x-auto py-0.5 [-ms-overflow-style:none] [scrollbar-width:none] min-w-0 flex-1 justify-start [&::-webkit-scrollbar]:hidden ${
-                isAdmin ? 'w-full' : ''
-              }`}
-              aria-label="Navegación del dashboard"
-            >
-              {sidebarItems.map((item) => {
-                const isActive =
-                  pathname === item.href ||
-                  (item.href !== '/' && pathname?.startsWith(item.href));
+            <div className="relative min-w-0 w-full flex-1">
+              <nav
+                className={`custom-scrollbar flex flex-nowrap gap-1.5 overflow-x-auto overscroll-x-contain scroll-smooth py-0.5 min-w-0 w-full justify-start ${
+                  isAdmin ? 'w-full' : ''
+                }`}
+                aria-label="Navegación del dashboard"
+              >
+                {sidebarItems.map((item) => {
+                  const isActive =
+                    pathname === item.href ||
+                    (item.href !== '/' && pathname?.startsWith(item.href));
 
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-sm transition-colors ${
-                      isActive
-                        ? 'bg-primary/10 text-primary font-semibold'
-                        : 'text-[#4b5563] dark:text-[#a3907d] hover:bg-[#f5f2f0]'
-                    }`}
-                    aria-current={isActive ? 'page' : undefined}
-                  >
-                    <span className="material-symbols-outlined text-base">{item.icon}</span>
-                    <span>{item.title}</span>
-                  </Link>
-                );
-              })}
-            </nav>
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-sm transition-colors ${
+                        isActive
+                          ? 'bg-primary/10 text-primary font-semibold'
+                          : 'text-[#4b5563] dark:text-[#a3907d] hover:bg-[#f5f2f0]'
+                      }`}
+                      aria-current={isActive ? 'page' : undefined}
+                    >
+                      <span className="material-symbols-outlined text-base">{item.icon}</span>
+                      <span>{item.title}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+              <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white/95 dark:from-[#2d2419]/95 to-transparent" />
+              <div className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-white/95 dark:from-[#2d2419]/95 to-transparent" />
+            </div>
           </div>
         </div>
 
@@ -254,32 +258,36 @@ export const Topbar = ({ userName, userRoleLabel, onRequestLogout }: TopbarProps
               </div>
             )}
 
-            <nav
-              className="flex flex-nowrap gap-1 overflow-x-auto min-w-0 flex-1 justify-start items-center py-0.5 [-ms-overflow-style:none] [scrollbar-width:none] max-w-none [&::-webkit-scrollbar]:hidden border-l border-[#e6e0db] pl-3 xl:pl-4"
-              aria-label="Navegación del dashboard"
-            >
-              {sidebarItems.map((item) => {
-                const isActive =
-                  pathname === item.href ||
-                  (item.href !== '/' && pathname?.startsWith(item.href));
+            <div className="relative min-w-0 w-full flex-1 border-l border-[#e6e0db] pl-3 xl:pl-4">
+              <nav
+                className="custom-scrollbar flex flex-nowrap gap-1 overflow-x-auto overscroll-x-contain scroll-smooth min-w-0 w-full flex-1 justify-start items-center py-0.5"
+                aria-label="Navegación del dashboard"
+              >
+                {sidebarItems.map((item) => {
+                  const isActive =
+                    pathname === item.href ||
+                    (item.href !== '/' && pathname?.startsWith(item.href));
 
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
-                      isActive
-                        ? 'bg-primary/10 text-primary font-semibold'
-                        : 'text-[#4b5563] dark:text-[#a3907d] hover:bg-[#f5f2f0]'
-                    }`}
-                    aria-current={isActive ? 'page' : undefined}
-                  >
-                    <span className="material-symbols-outlined text-base">{item.icon}</span>
-                    <span>{item.title}</span>
-                  </Link>
-                );
-              })}
-            </nav>
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
+                        isActive
+                          ? 'bg-primary/10 text-primary font-semibold'
+                          : 'text-[#4b5563] dark:text-[#a3907d] hover:bg-[#f5f2f0]'
+                      }`}
+                      aria-current={isActive ? 'page' : undefined}
+                    >
+                      <span className="material-symbols-outlined text-base">{item.icon}</span>
+                      <span>{item.title}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+              <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white/95 dark:from-[#2d2419]/95 to-transparent" />
+              <div className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-white/95 dark:from-[#2d2419]/95 to-transparent" />
+            </div>
           </div>
 
           <TopActions />

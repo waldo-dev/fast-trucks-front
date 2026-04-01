@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { businessService, categoryService, productService } from '@/lib/services';
 import { readOperatingContext } from '@/lib/operatingContext';
 import { toast } from 'react-toastify';
+import { CategoryCreateModal } from '@/components/products/CategoryCreateModal';
 import { ProductFilters } from '@/components/products/ProductFilters';
+import { ProductFormModal } from '@/components/products/ProductFormModal';
 import { ProductTable } from '@/components/products/ProductTable';
 
 export default function ProductsPage() {
@@ -25,17 +27,12 @@ export default function ProductsPage() {
   >([]);
   const [loading, setLoading] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [newCategory, setNewCategory] = useState('');
   const [categories, setCategories] = useState<
     Array<{ id: string; name: string; icon?: string; count?: number }>
   >([]);
   const [categoryVenues, setCategoryVenues] = useState<string[]>([]);
-  const [savingCategory, setSavingCategory] = useState(false);
-  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [categoryModalHint, setCategoryModalHint] = useState<string | null>(null);
   const [showProductModal, setShowProductModal] = useState(false);
-  const [productError, setProductError] = useState<string | null>(null);
-  const [productSaving, setProductSaving] = useState(false);
-  const [productLoading, setProductLoading] = useState(false);
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
   const [confirmProduct, setConfirmProduct] = useState<{
     id: number;
@@ -56,17 +53,6 @@ export default function ProductsPage() {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSummary, setImportSummary] = useState<string | null>(null);
-  const [productForm, setProductForm] = useState({
-    name: '',
-    description: '',
-    sku: '',
-    price: '',
-    category_id: '',
-    status: 'active' as 'active' | 'paused' | 'draft',
-    options: '',
-    image: null as File | null,
-  });
-  const [productVenues, setProductVenues] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showExportConfirm, setShowExportConfirm] = useState(false);
@@ -103,37 +89,8 @@ export default function ProductsPage() {
   };
 
   const handleEdit = (id: number) => {
-    setProductError(null);
-    setProductLoading(true);
-    setShowProductModal(true);
     setEditingProductId(id);
-    productService
-      .get(id)
-      .then((resp: any) => {
-        const data = resp?.data ?? resp;
-        setProductForm({
-          name: data?.name || '',
-          description: data?.description || '',
-          sku: data?.sku || '',
-          price: data?.price ? String(data.price) : '',
-          category_id: data?.category_id ? String(data.category_id) : '',
-          status: (data?.status as 'active' | 'paused' | 'draft') || 'active',
-          options: data?.options || '',
-          image: null,
-        });
-        const bizIds: string[] = Array.isArray(data?.business_ids)
-          ? data.business_ids.map((b: any) => String(b))
-          : data?.business_id
-          ? [String(data.business_id)]
-          : [];
-        setProductVenues(bizIds);
-      })
-      .catch((err: any) => {
-        setProductError(
-          err instanceof Error ? err.message : 'No se pudo cargar el producto'
-        );
-      })
-      .finally(() => setProductLoading(false));
+    setShowProductModal(true);
   };
 
   const handleViewDetails = (id: number) => {
@@ -144,12 +101,12 @@ export default function ProductsPage() {
   const handleAddProduct = () => {
     const hasCategories = categories.some((c) => c.id !== '');
     if (!hasCategories) {
+      setCategoryModalHint('Primero crea una categoría para asociar el producto.');
       setShowCategoryModal(true);
-      setCategoryError('Primero crea una categoría para asociar el producto.');
       return;
     }
+    setEditingProductId(null);
     setShowProductModal(true);
-    setProductError(null);
   };
 
   const handleSync = () => {
@@ -418,7 +375,10 @@ export default function ProductsPage() {
             Nuevo producto
           </button>
           <button
-            onClick={() => setShowCategoryModal(true)}
+            onClick={() => {
+              setCategoryModalHint(null);
+              setShowCategoryModal(true);
+            }}
             className="flex items-center gap-2 bg-white text-primary border border-primary/30 hover:bg-primary/5 px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-transform active:scale-95 shadow-sm w-full sm:w-auto justify-center"
           >
             <span className="material-symbols-outlined text-[20px]">category</span>
@@ -531,7 +491,14 @@ export default function ProductsPage() {
                       : 'No hay productos disponibles con los filtros actuales.'}
                   </span>
                   <button
-                    onClick={categoriesCount === 0 ? () => setShowCategoryModal(true) : handleAddProduct}
+                    onClick={
+                      categoriesCount === 0
+                        ? () => {
+                            setCategoryModalHint(null);
+                            setShowCategoryModal(true);
+                          }
+                        : handleAddProduct
+                    }
                     className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg text-sm font-bold transition-transform active:scale-95 shadow-lg shadow-primary/20 w-full sm:w-auto justify-center"
                   >
                     <span className="material-symbols-outlined text-[20px]">
@@ -732,373 +699,30 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {showCategoryModal && (
-        <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center px-4 py-6 overflow-y-auto"
-          onClick={() => {
-            setShowCategoryModal(false);
-            setNewCategory('');
-            setCategoryError(null);
-          }}
-        >
-          <div
-            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-md p-6 relative max-h-[85vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              className="absolute top-3 right-3 text-gray-500 hover:text-primary"
-              onClick={() => {
-                setShowCategoryModal(false);
-                setNewCategory('');
-              }}
-              aria-label="Cerrar"
-            >
-              <span className="material-symbols-outlined">close</span>
-            </button>
-            <h3 className="text-lg font-bold text-[#181411] mb-2">Crear nueva categoría</h3>
-            <p className="text-sm text-gray-500 mb-4">Ingresa el nombre de la categoría.</p>
-            <form
-              className="flex flex-col gap-3"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (!newCategory.trim()) return;
-                const ctx = readOperatingContext();
-                const businessId =
-                  ctx?.type === 'business' && ctx.business_id ? Number(ctx.business_id) : undefined;
-                if (!businessId || Number.isNaN(businessId)) {
-                  setCategoryError('No hay un local seleccionado en el contexto.');
-                  return;
-                }
-                setSavingCategory(true);
-                setCategoryError(null);
-                try {
-                  const resp = await categoryService.create({
-                    name: newCategory.trim(),
-                    business_id: businessId,
-                  });
-                  const created = (resp as any)?.data ?? resp;
-                  const newItem = {
-                    id: String(created?.id || Math.random()),
-                    name: created?.name || newCategory.trim(),
-                    icon: 'category',
-                  };
-                  setCategories((prev) => {
-                    const filtered = prev.filter((c) => c.id !== newItem.id);
-                    return [
-                      { id: '', name: 'Todas', icon: 'category' },
-                      ...filtered.filter((c) => c.id !== ''),
-                      newItem,
-                    ];
-                  });
-                  setShowCategoryModal(false);
-                  setNewCategory('');
-                  // Reload categories to reflect server state
-                  await loadCategories();
-                } catch (err) {
-                  setCategoryError(
-                    err instanceof Error ? err.message : 'No se pudo crear la categoría'
-                  );
-                } finally {
-                  setSavingCategory(false);
-                }
-              }}
-            >
-              <input
-                className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none"
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-                placeholder="Ej. Bebidas"
-                required
-              />
-              {/* Selección de locales removida: se usa el business del contexto */}
-              {categoryError && (
-                <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                  {categoryError}
-                </div>
-              )}
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCategoryModal(false);
-                    setNewCategory('');
-                    setCategoryError(null);
-                  }}
-                  className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingCategory}
-                  className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {savingCategory ? 'Guardando...' : 'Guardar'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <CategoryCreateModal
+        open={showCategoryModal}
+        contextHint={categoryModalHint}
+        onClose={() => {
+          setShowCategoryModal(false);
+          setCategoryModalHint(null);
+        }}
+        onCreated={loadCategories}
+      />
 
-      {showProductModal && (
-        <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center px-4 py-6 overflow-y-auto"
-          onClick={() => {
-            setShowProductModal(false);
-            setProductError(null);
-            setProductForm({
-              name: '',
-              description: '',
-              sku: '',
-              price: '',
-              category_id: '',
-              status: 'active',
-              options: '',
-              image: null,
-            });
-            setEditingProductId(null);
-          }}
-        >
-          <div
-            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-2xl p-6 relative max-h-[85vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              className="absolute top-3 right-3 text-gray-500 hover:text-primary"
-              onClick={() => {
-                setShowProductModal(false);
-                setProductError(null);
-                setProductForm({
-                  name: '',
-                  description: '',
-                  sku: '',
-                  price: '',
-                  category_id: '',
-                  status: 'active',
-                  options: '',
-                  image: null,
-                });
-                setProductVenues([]);
-                setEditingProductId(null);
-                setProductLoading(false);
-              }}
-              aria-label="Cerrar"
-            >
-              <span className="material-symbols-outlined">close</span>
-            </button>
-            <h3 className="text-lg font-bold text-[#181411] mb-2">
-              {editingProductId ? 'Editar producto' : 'Crear nuevo producto'}
-            </h3>
-            <p className="text-sm text-gray-500 mb-4">
-              Completa los datos y sube una imagen (opcional).
-            </p>
-            <form
-              className="grid grid-cols-1 md:grid-cols-2 gap-4"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setProductError(null);
-                if (!productForm.name || !productForm.price || !productForm.category_id) {
-                  setProductError('Nombre, precio y categoría son obligatorios');
-                  return;
-                }
-                const ctx = readOperatingContext();
-                const ctxBusinessId =
-                  ctx?.type === 'business' && ctx.business_id ? Number(ctx.business_id) : undefined;
-                if (!ctxBusinessId || Number.isNaN(ctxBusinessId)) {
-                  setProductError('No hay un local seleccionado en el contexto.');
-                  return;
-                }
-                setProductSaving(true);
-                try {
-                  let promise: Promise<unknown>;
-                  if (editingProductId) {
-                    promise = productService.update(editingProductId, {
-                      name: productForm.name,
-                      description: productForm.description || undefined,
-                      sku: productForm.sku || undefined,
-                      price: productForm.price,
-                      category_id: productForm.category_id,
-                      status: productForm.status,
-                      options: productForm.options || undefined,
-                      business_ids: [ctxBusinessId],
-                    });
-                  } else {
-                    promise = productService.createWithImage({
-                      name: productForm.name,
-                      description: productForm.description || undefined,
-                      sku: productForm.sku || undefined,
-                      price: productForm.price,
-                      category_id: productForm.category_id,
-                      status: productForm.status,
-                      options: productForm.options || undefined,
-                      business_id: ctxBusinessId,
-                      image: productForm.image || undefined,
-                    });
-                  }
-
-                  await toast.promise(promise, {
-                    pending: editingProductId ? 'Actualizando producto...' : 'Creando producto...',
-                    success: editingProductId ? 'Producto actualizado' : 'Producto creado',
-                    error: 'No se pudo guardar el producto',
-                  });
-
-                  setShowProductModal(false);
-                  setProductForm({
-                    name: '',
-                    description: '',
-                  sku: '',
-                    price: '',
-                    category_id: '',
-                    status: 'active',
-                    options: '',
-                    image: null,
-                  });
-                  setEditingProductId(null);
-                  setProductLoading(false);
-                  await loadProducts();
-                } catch (err) {
-                  setProductError(
-                    err instanceof Error ? err.message : 'No se pudo crear el producto'
-                  );
-                } finally {
-                  setProductSaving(false);
-                }
-              }}
-            >
-              {productLoading && (
-                <div className="md:col-span-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                  Cargando información del producto...
-                </div>
-              )}
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-[#181411]">Nombre</label>
-                <input
-                  className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none"
-                  value={productForm.name}
-                  onChange={(e) => setProductForm((p) => ({ ...p, name: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-[#181411]">SKU (opcional)</label>
-                <input
-                  className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none"
-                  value={productForm.sku}
-                  onChange={(e) => setProductForm((p) => ({ ...p, sku: e.target.value }))}
-                  placeholder="Ej. SKU-123 (vacío = auto)"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-[#181411]">Precio</label>
-                <input
-                  className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none"
-                  type="number"
-                  step="0.01"
-                  value={productForm.price}
-                  onChange={(e) => setProductForm((p) => ({ ...p, price: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="flex flex-col gap-2 md:col-span-2">
-                <label className="text-sm font-semibold text-[#181411]">Descripción</label>
-                <textarea
-                  className="min-h-[80px] rounded-lg border border-primary/20 px-3 py-2 text-sm focus:ring-2 focus:ring-primary/30 outline-none"
-                  value={productForm.description}
-                  onChange={(e) => setProductForm((p) => ({ ...p, description: e.target.value }))}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-[#181411]">Categoría</label>
-                <select
-                  className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none"
-                  value={productForm.category_id}
-                  onChange={(e) => setProductForm((p) => ({ ...p, category_id: e.target.value }))}
-                  required
-                >
-                  <option value="">Selecciona...</option>
-                  {categories
-                    .filter((c) => c.id !== '')
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-[#181411]">Estado</label>
-                <select
-                  className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none"
-                  value={productForm.status}
-                  onChange={(e) =>
-                    setProductForm((p) => ({ ...p, status: e.target.value as 'active' | 'paused' | 'draft' }))
-                  }
-                >
-                  <option value="active">Activo</option>
-                  <option value="paused">Pausado</option>
-                  <option value="draft">Borrador</option>
-                </select>
-              </div>
-              {/* Asociar a locales: se usa el business del contexto, no selección manual */}
-              {/*<div className="flex flex-col gap-2 md:col-span-2">
-                <label className="text-sm font-semibold text-[#181411]">Opciones (JSON opcional)</label>
-                <textarea
-                  className="min-h-[80px] rounded-lg border border-primary/20 px-3 py-2 text-sm focus:ring-2 focus:ring-primary/30 outline-none"
-                  placeholder='Ej: [{"name":"Tamaño","values":["S","M","L"]}]'
-                  value={productForm.options}
-                  onChange={(e) => setProductForm((p) => ({ ...p, options: e.target.value }))}
-                />
-              </div>*/}
-              <div className="flex flex-col gap-2 md:col-span-2">
-                <label className="text-sm font-semibold text-[#181411]">Imagen (archivo)</label>
-                <input
-                  className="h-11 rounded-lg border border-primary/20 px-3 text-sm file:mr-3 file:py-2 file:px-3 file:border-0 file:rounded-md file:bg-primary file:text-white"
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) =>
-                    setProductForm((p) => ({ ...p, image: e.target.files?.[0] || null }))
-                  }
-                />
-              </div>
-              {productError && (
-                <div className="md:col-span-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                  {productError}
-                </div>
-              )}
-              <div className="md:col-span-2 flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowProductModal(false);
-                    setProductError(null);
-                    setProductForm({
-                      name: '',
-                      description: '',
-                  sku: '',
-                      price: '',
-                      category_id: '',
-                      status: 'active',
-                      options: '',
-                      image: null,
-                    });
-                  }}
-                  className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={productSaving}
-                  className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {productSaving ? 'Guardando...' : 'Guardar producto'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <ProductFormModal
+        open={showProductModal}
+        editingProductId={editingProductId}
+        categories={categories}
+        onClose={() => {
+          setShowProductModal(false);
+          setEditingProductId(null);
+        }}
+        onSaved={loadProducts}
+        onRequestNewCategory={() => {
+          setCategoryModalHint(null);
+          setShowCategoryModal(true);
+        }}
+      />
 
       {filtersOpen && (
         <div
@@ -1487,6 +1111,7 @@ export default function ProductsPage() {
                 className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90"
                 onClick={() => {
                   setShowCategoriesList(false);
+                  setCategoryModalHint(null);
                   setShowCategoryModal(true);
                 }}
               >

@@ -1,10 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { CategoryCreateModal } from "@/components/products/CategoryCreateModal";
+import { ProductFormModal } from "@/components/products/ProductFormModal";
 import { useOperatingContext } from "@/lib/hooks/useOperatingContext";
 import { toast } from "react-toastify";
-import { businessService, categoryService, productService } from "@/lib/services";
+import {
+  businessService,
+  categoryService,
+  productService,
+  publicMenuService,
+} from "@/lib/services";
 
 type MenuProduct = {
   id: number;
@@ -32,26 +39,19 @@ export default function MenuPage() {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [products, setProducts] = useState<MenuProduct[]>([]);
 
-  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [categories, setCategories] = useState<
+    Array<{ id: string; name: string; icon?: string }>
+  >([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
 
   const [business, setBusiness] = useState<BusinessDto | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const [templateDownloading, setTemplateDownloading] = useState(false);
 
-  const [showEditModal, setShowEditModal] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [categoryModalHint, setCategoryModalHint] = useState<string | null>(null);
+  const [showProductModal, setShowProductModal] = useState(false);
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
-  const [productLoading, setProductLoading] = useState(false);
-  const [productSaving, setProductSaving] = useState(false);
-  const [productError, setProductError] = useState<string | null>(null);
-  const [productForm, setProductForm] = useState({
-    name: "",
-    description: "",
-    sku: "",
-    price: "",
-    category_id: "",
-    status: "active" as "active" | "paused" | "draft",
-    image: null as File | null,
-  });
 
   const priceFormatter = useMemo(() => {
     try {
@@ -79,6 +79,29 @@ export default function MenuPage() {
     return trimmed;
   };
 
+  const handleDownloadMenuTemplate = async () => {
+    setTemplateDownloading(true);
+    try {
+      const { blob, filename } = await publicMenuService.downloadMenuTemplate();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = filename;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+      toast.success("Plantilla descargada");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "No se pudo descargar la plantilla",
+      );
+    } finally {
+      setTemplateDownloading(false);
+    }
+  };
+
   const slugifyBrandName = (value: string) => {
     return value
       .trim()
@@ -88,6 +111,87 @@ export default function MenuPage() {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .replace(/-+/g, "-");
+  };
+
+  const reloadCategories = useCallback(async () => {
+    if (!businessId) {
+      setCategories([]);
+      return;
+    }
+    setLoadingCategories(true);
+    try {
+      const resp = await categoryService.listByOwner({ business_id: businessId });
+      const list = (resp as any)?.data ?? resp;
+      const mapped = Array.isArray(list)
+        ? list.map((c: any) => ({
+            id: String(c?.id ?? ""),
+            name: c?.name || "Sin nombre",
+            icon: "category" as const,
+          }))
+        : [];
+      setCategories(mapped.filter((c) => c.id));
+    } catch {
+      setCategories([]);
+    } finally {
+      setLoadingCategories(false);
+    }
+  }, [businessId]);
+
+  const reloadMenuProducts = useCallback(async () => {
+    if (!businessId) {
+      setProducts([]);
+      return;
+    }
+    setLoadingProducts(true);
+    try {
+      const resp = await productService.listByOwner({
+        business_id: businessId,
+      });
+      const list = (resp as any)?.data ?? resp;
+      const mapped: MenuProduct[] = Array.isArray(list)
+        ? list.map((p: any) => ({
+            id: Number(p?.id) || 0,
+            name: p?.name || "Sin nombre",
+            price: p?.price,
+            imageUrl: p?.image_url || p?.image || p?.imageUrl || p?.imageURL,
+            status: p?.status ? String(p.status).toUpperCase() : undefined,
+            categoryName: p?.category?.name || "Sin categoría",
+          }))
+        : [];
+      setProducts(mapped.filter((p) => p.id));
+    } catch {
+      setProducts([]);
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, [businessId]);
+
+  const openAddCategory = () => {
+    if (!businessId) {
+      toast.error("Selecciona un negocio para continuar");
+      return;
+    }
+    setCategoryModalHint(null);
+    setShowCategoryModal(true);
+  };
+
+  const openAddProduct = () => {
+    if (!businessId) {
+      toast.error("Selecciona un negocio para continuar");
+      return;
+    }
+    if (!categories.length) {
+      setCategoryModalHint("Primero crea una categoría para poder añadir productos.");
+      setShowCategoryModal(true);
+      return;
+    }
+    setEditingProductId(null);
+    setShowProductModal(true);
+  };
+
+  const openEditProduct = (id: number) => {
+    setEditingProductId(id);
+    setShowProductModal(true);
   };
 
   useEffect(() => {
@@ -113,111 +217,12 @@ export default function MenuPage() {
   }, [businessId]);
 
   useEffect(() => {
-    let alive = true;
-    const loadCategories = async () => {
-      if (!businessId) {
-        setCategories([]);
-        return;
-      }
-      setLoadingCategories(true);
-      try {
-        const resp = await categoryService.listByOwner({ business_id: businessId });
-        const list = (resp as any)?.data ?? resp;
-        const mapped = Array.isArray(list)
-          ? list.map((c: any) => ({
-              id: String(c?.id ?? ""),
-              name: c?.name || "Sin nombre",
-            }))
-          : [];
-        if (alive) setCategories(mapped.filter((c) => c.id));
-      } catch {
-        if (alive) setCategories([]);
-      } finally {
-        if (alive) setLoadingCategories(false);
-      }
-    };
-
-    loadCategories();
-    return () => {
-      alive = false;
-    };
-  }, [businessId]);
+    void reloadCategories();
+  }, [reloadCategories]);
 
   useEffect(() => {
-    let alive = true;
-
-    const loadForEdit = async () => {
-      if (!showEditModal || !editingProductId) return;
-      setProductError(null);
-      setProductLoading(true);
-      try {
-        const resp = await productService.get(editingProductId);
-        const data = (resp as any)?.data ?? resp;
-        if (!alive) return;
-        setProductForm({
-          name: data?.name || "",
-          description: data?.description || "",
-          sku: data?.sku || "",
-          price: data?.price ? String(data.price) : "",
-          category_id: data?.category_id ? String(data.category_id) : "",
-          status: (data?.status as "active" | "paused" | "draft") || "active",
-          image: null,
-        });
-      } catch (err) {
-        if (alive) {
-          setProductError(err instanceof Error ? err.message : "No se pudo cargar el producto");
-        }
-      } finally {
-        if (alive) setProductLoading(false);
-      }
-    };
-
-    loadForEdit();
-
-    return () => {
-      alive = false;
-    };
-  }, [showEditModal, editingProductId]);
-
-  useEffect(() => {
-    let alive = true;
-
-    const load = async () => {
-      if (!businessId) {
-        setProducts([]);
-        return;
-      }
-
-      setLoadingProducts(true);
-      try {
-        const resp = await productService.listByOwner({
-          business_id: businessId,
-        });
-        const list = (resp as any)?.data ?? resp;
-        const mapped: MenuProduct[] = Array.isArray(list)
-          ? list.map((p: any) => ({
-              id: Number(p?.id) || 0,
-              name: p?.name || "Sin nombre",
-              price: p?.price,
-              imageUrl: p?.image_url || p?.image || p?.imageUrl || p?.imageURL,
-              status: p?.status ? String(p.status).toUpperCase() : undefined,
-              categoryName: p?.category?.name || "Sin categoría",
-            }))
-          : [];
-        if (alive) setProducts(mapped.filter((p) => p.id));
-      } catch {
-        if (alive) setProducts([]);
-      } finally {
-        if (alive) setLoadingProducts(false);
-      }
-    };
-
-    load();
-
-    return () => {
-      alive = false;
-    };
-  }, [businessId]);
+    void reloadMenuProducts();
+  }, [reloadMenuProducts]);
 
   const productCount = products.length;
   const hasProducts = productCount > 0;
@@ -244,9 +249,21 @@ export default function MenuPage() {
             Menú digital
           </h1>
           <p className="text-sm text-[#8a7560]">
-            Sube tu menú (CSV/PDF/imagen) o cárgalo manualmente para activar los
-            pedidos.
+            Sube tu menú (CSV/PDF/imagen) o crea categorías y productos desde aquí para activar
+            los pedidos.
           </p>
+          <div className="pt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[#8a7560]">
+            <span className="font-semibold text-[#5d4b3f]">¿No tienes menú?</span>
+            <span>Empieza con nuestra plantilla CSV y complétala en minutos.</span>
+            <button
+              type="button"
+              disabled={templateDownloading}
+              onClick={handleDownloadMenuTemplate}
+              className="inline-flex items-center text-primary font-bold underline decoration-primary/40 underline-offset-2 hover:decoration-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {templateDownloading ? "Descargando…" : "Descargar plantilla CSV"}
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -294,7 +311,7 @@ export default function MenuPage() {
           >
             {publishing ? "Publicando..." : "Publicar"}
           </button>
-          <Link
+          {/*<Link
             href="/menu/preview"
             aria-disabled={hasBusiness && !loadingProducts && !hasProducts}
             className={`inline-flex items-center justify-center h-10 px-4 rounded-xl border border-[#e6e0db] text-[#5d4b3f] font-bold text-sm hover:bg-[#f7f3ef] ${
@@ -304,7 +321,7 @@ export default function MenuPage() {
             }`}
           >
             Vista previa
-          </Link>
+          </Link>*/}
           <Link
             href="/menu/onboarding"
             className="inline-flex items-center justify-center h-10 px-4 rounded-xl bg-primary text-white font-bold text-sm hover:brightness-95"
@@ -327,20 +344,30 @@ export default function MenuPage() {
 
       {hasBusiness && (
         <div className="space-y-4">
-          <div className="rounded-2xl border border-[#e6e0db] bg-white p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="space-y-1">
-              <p className="text-sm font-black text-[#181411]">Lo que vendes (catálogo)</p>
-              <p className="text-sm text-[#8a7560]">
-                {loadingProducts
-                  ? "Revisando productos asociados al local activo..."
-                  : hasProducts
-                  ? `Detectamos ${productCount} producto(s). Ya puedes armar tu menú.`
-                  : "Aún no hay productos asociados a este negocio. Crea productos para poder armar el menú."}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 justify-end">
-              {hasProducts ? (
-                <div className="flex flex-wrap items-center gap-2 justify-end">
+          {hasProducts && !loadingProducts && (
+            <div className="rounded-2xl border border-[#e6e0db] bg-white p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-[#181411]">Tu menú (catálogo)</p>
+                  <p className="text-sm text-[#8a7560]">
+                    Productos asociados a este local, agrupados por categoría.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 justify-end shrink-0">
+                  <button
+                    type="button"
+                    onClick={openAddCategory}
+                    className="inline-flex items-center justify-center h-9 px-3 rounded-lg border border-[#e6e0db] text-[#5d4b3f] font-bold text-xs hover:bg-[#f7f3ef]"
+                  >
+                    Agregar categoría
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openAddProduct}
+                    className="inline-flex items-center justify-center h-9 px-3 rounded-lg bg-primary text-white font-bold text-xs hover:brightness-95"
+                  >
+                    Añadir producto
+                  </button>
                   <Link
                     href="/menu/onboarding?tab=csv"
                     className="inline-flex items-center justify-center h-9 px-3 rounded-lg border border-[#e6e0db] text-[#5d4b3f] font-bold text-xs hover:bg-[#f7f3ef]"
@@ -353,34 +380,6 @@ export default function MenuPage() {
                   >
                     Subir PDF/imagen
                   </Link>
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-2 justify-end">
-                  <Link
-                    href="/menu/onboarding?tab=manual"
-                    className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-[#e6e0db] text-[#5d4b3f] font-bold text-sm hover:bg-[#f7f3ef]"
-                  >
-                    Cargar manual
-                  </Link>
-                  <Link
-                    href="/menu/onboarding?tab=manual"
-                    className="inline-flex items-center justify-center h-10 px-4 rounded-xl bg-primary text-white font-bold text-sm hover:brightness-95"
-                  >
-                    Crear menú
-                  </Link>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {hasProducts && !loadingProducts && (
-            <div className="rounded-2xl border border-[#e6e0db] bg-white p-5 space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-black text-[#181411]">Tu menú (catálogo)</p>
-                  <p className="text-sm text-[#8a7560]">
-                    Productos asociados a este local, agrupados por categoría.
-                  </p>
                 </div>
               </div>
 
@@ -413,18 +412,10 @@ export default function MenuPage() {
                             <p className="text-sm font-semibold text-[#181411] truncate">
                               {p.name}
                             </p>
-                            <p className="text-xs text-[#8a7560]">
-                              {formatPrice(p.price) ? formatPrice(p.price) : "Sin precio"}
-                              {p.status ? ` · ${p.status}` : ""}
-                            </p>
                           </div>
                           <button
                             type="button"
-                            onClick={() => {
-                              setProductError(null);
-                              setEditingProductId(p.id);
-                              setShowEditModal(true);
-                            }}
+                            onClick={() => openEditProduct(p.id)}
                             className="inline-flex items-center justify-center h-8 px-3 rounded-lg border border-[#e6e0db] text-[#5d4b3f] font-bold text-xs hover:bg-[#f7f3ef] flex-shrink-0"
                           >
                             Editar
@@ -449,51 +440,49 @@ export default function MenuPage() {
                 No hay productos para este local.
               </p>
               <p className="text-sm text-[#8a7560] mt-1">
-                Agrega al menos un producto desde este mismo módulo “Menú” y vuelve aquí para continuar.
+                Usa los botones de abajo: categoría, producto, importar CSV o subir PDF/imagen.
               </p>
             </div>
           )}
 
           {!loadingProducts && !hasProducts && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="rounded-2xl border border-[#e6e0db] bg-white p-5 space-y-2">
-            <p className="text-sm font-black text-[#181411]">CSV</p>
-            <p className="text-sm text-[#8a7560]">
-              Importa productos automáticamente desde un CSV.
-            </p>
-            <Link
-              href="/menu/onboarding?tab=csv"
-              className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-[#e6e0db] text-[#5d4b3f] font-bold text-sm hover:bg-[#f7f3ef]"
-            >
-              Importar CSV
-            </Link>
+            <div className="rounded-2xl border border-[#e6e0db] bg-white p-5 space-y-4">
+              <div className="space-y-1">
+                <p className="text-sm font-black text-[#181411]">Cargar tu menú</p>
+                <p className="text-sm text-[#8a7560]">
+                  Añade categorías y productos con el mismo formulario que en Productos, importa un CSV
+                  o sube un PDF o imagen para revisión.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={openAddCategory}
+                  className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-[#e6e0db] text-[#5d4b3f] font-bold text-sm hover:bg-[#f7f3ef]"
+                >
+                  Agregar categoría
+                </button>
+                <button
+                  type="button"
+                  onClick={openAddProduct}
+                  className="inline-flex items-center justify-center h-10 px-4 rounded-xl bg-primary text-white font-bold text-sm hover:brightness-95"
+                >
+                  Añadir producto
+                </button>
+                <Link
+                  href="/menu/onboarding?tab=csv"
+                  className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-[#e6e0db] text-[#5d4b3f] font-bold text-sm hover:bg-[#f7f3ef]"
+                >
+                  Importar CSV
+                </Link>
+                <Link
+                  href="/menu/onboarding?tab=file"
+                  className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-[#e6e0db] text-[#5d4b3f] font-bold text-sm hover:bg-[#f7f3ef]"
+                >
+                  Subir PDF/imagen
+                </Link>
+              </div>
             </div>
-            <div className="rounded-2xl border border-[#e6e0db] bg-white p-5 space-y-2">
-            <p className="text-sm font-black text-[#181411]">PDF / Imagen</p>
-            <p className="text-sm text-[#8a7560]">
-              Sube un archivo para que el equipo lo revise y lo convierta.
-            </p>
-            <Link
-              href="/menu/onboarding?tab=file"
-              className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-[#e6e0db] text-[#5d4b3f] font-bold text-sm hover:bg-[#f7f3ef]"
-            >
-              Subir archivo
-            </Link>
-            </div>
-            <div className="rounded-2xl border border-[#e6e0db] bg-white p-5 space-y-2">
-            <p className="text-sm font-black text-[#181411]">Manual</p>
-            <p className="text-sm text-[#8a7560]">
-              Si aún no tienes un archivo listo, puedes continuar con carga
-              manual.
-            </p>
-            <Link
-              href="/menu/onboarding?tab=manual"
-              className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-[#e6e0db] text-[#5d4b3f] font-bold text-sm hover:bg-[#f7f3ef]"
-            >
-              Cargar manual
-            </Link>
-            </div>
-          </div>
           )}
 
           {loadingProducts && (
@@ -504,232 +493,31 @@ export default function MenuPage() {
         </div>
       )}
 
-      {showEditModal && (
-        <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center px-4 py-6 overflow-y-auto"
-          onClick={() => {
-            setShowEditModal(false);
-            setEditingProductId(null);
-            setProductError(null);
-            setProductLoading(false);
-            setProductSaving(false);
-            setProductForm({
-              name: "",
-              description: "",
-              sku: "",
-              price: "",
-              category_id: "",
-              status: "active",
-              image: null,
-            });
-          }}
-        >
-          <div
-            className="bg-white rounded-xl shadow-2xl border border-primary/10 w-full max-w-2xl p-6 relative max-h-[85vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              className="absolute top-3 right-3 text-gray-500 hover:text-primary"
-              onClick={() => {
-                setShowEditModal(false);
-                setEditingProductId(null);
-                setProductError(null);
-              }}
-              aria-label="Cerrar"
-            >
-              <span className="material-symbols-outlined">close</span>
-            </button>
+      <CategoryCreateModal
+        open={showCategoryModal}
+        contextHint={categoryModalHint}
+        onClose={() => {
+          setShowCategoryModal(false);
+          setCategoryModalHint(null);
+        }}
+        onCreated={reloadCategories}
+      />
 
-            <h3 className="text-lg font-bold text-[#181411] mb-2">Editar producto</h3>
-            <p className="text-sm text-gray-500 mb-4">
-              Actualiza los datos del producto. (Se edita con el mismo formulario que en Productos.)
-            </p>
-
-            <form
-              className="grid grid-cols-1 md:grid-cols-2 gap-4"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setProductError(null);
-                if (!editingProductId) return;
-                if (!businessId) {
-                  toast.error("Selecciona un negocio para continuar");
-                  return;
-                }
-                if (!productForm.name || !productForm.price || !productForm.category_id) {
-                  setProductError("Nombre, precio y categoría son obligatorios");
-                  return;
-                }
-
-                setProductSaving(true);
-                try {
-                  await toast.promise(
-                    productService.update(editingProductId, {
-                      name: productForm.name,
-                      description: productForm.description || undefined,
-                      sku: productForm.sku || undefined,
-                      price: productForm.price,
-                      category_id: productForm.category_id,
-                      status: productForm.status,
-                      business_ids: [Number(businessId)],
-                    }),
-                    {
-                      pending: "Actualizando producto...",
-                      success: "Producto actualizado",
-                      error: "No se pudo guardar el producto",
-                    },
-                  );
-
-                  const resp = await productService.listByOwner({ business_id: businessId });
-                  const list = (resp as any)?.data ?? resp;
-                  const mapped: MenuProduct[] = Array.isArray(list)
-                    ? list.map((p: any) => ({
-                        id: Number(p?.id) || 0,
-                        name: p?.name || "Sin nombre",
-                        price: p?.price,
-                        imageUrl: p?.image_url || p?.image || p?.imageUrl || p?.imageURL,
-                        status: p?.status ? String(p.status).toUpperCase() : undefined,
-                        categoryName: p?.category?.name || "Sin categoría",
-                      }))
-                    : [];
-                  setProducts(mapped.filter((p) => p.id));
-
-                  setShowEditModal(false);
-                  setEditingProductId(null);
-                } catch (err) {
-                  setProductError(err instanceof Error ? err.message : "No se pudo actualizar");
-                } finally {
-                  setProductSaving(false);
-                }
-              }}
-            >
-              {productLoading && (
-                <div className="md:col-span-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                  Cargando información del producto...
-                </div>
-              )}
-
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-[#181411]">Nombre</label>
-                <input
-                  className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none"
-                  value={productForm.name}
-                  onChange={(e) => setProductForm((p) => ({ ...p, name: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-[#181411]">SKU (opcional)</label>
-                <input
-                  className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none"
-                  value={productForm.sku}
-                  onChange={(e) => setProductForm((p) => ({ ...p, sku: e.target.value }))}
-                  placeholder="Ej. SKU-123"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-[#181411]">Precio</label>
-                <input
-                  className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none"
-                  type="number"
-                  step="0.01"
-                  value={productForm.price}
-                  onChange={(e) => setProductForm((p) => ({ ...p, price: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="flex flex-col gap-2 md:col-span-2">
-                <label className="text-sm font-semibold text-[#181411]">Descripción</label>
-                <textarea
-                  className="min-h-[80px] rounded-lg border border-primary/20 px-3 py-2 text-sm focus:ring-2 focus:ring-primary/30 outline-none"
-                  value={productForm.description}
-                  onChange={(e) =>
-                    setProductForm((p) => ({ ...p, description: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-[#181411]">Categoría</label>
-                <select
-                  className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none"
-                  value={productForm.category_id}
-                  onChange={(e) =>
-                    setProductForm((p) => ({ ...p, category_id: e.target.value }))
-                  }
-                  required
-                  disabled={loadingCategories}
-                >
-                  <option value="">
-                    {loadingCategories ? "Cargando categorías..." : "Selecciona..."}
-                  </option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-[#181411]">Estado</label>
-                <select
-                  className="h-11 rounded-lg border border-primary/20 px-3 text-sm focus:ring-2 focus:ring-primary/30 outline-none"
-                  value={productForm.status}
-                  onChange={(e) =>
-                    setProductForm((p) => ({
-                      ...p,
-                      status: e.target.value as "active" | "paused" | "draft",
-                    }))
-                  }
-                >
-                  <option value="active">Activo</option>
-                  <option value="paused">Pausado</option>
-                  <option value="draft">Borrador</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-2 md:col-span-2">
-                <label className="text-sm font-semibold text-[#181411]">Imagen (archivo)</label>
-                <input
-                  className="h-11 rounded-lg border border-primary/20 px-3 text-sm file:mr-3 file:py-2 file:px-3 file:border-0 file:rounded-md file:bg-primary file:text-white"
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) =>
-                    setProductForm((p) => ({ ...p, image: e.target.files?.[0] || null }))
-                  }
-                />
-                <p className="text-xs text-[#8a7560]">
-                  Nota: en edición, este formulario guarda los datos; la imagen se gestiona desde Productos si tu backend requiere endpoint especial.
-                </p>
-              </div>
-
-              {productError && (
-                <div className="md:col-span-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                  {productError}
-                </div>
-              )}
-
-              <div className="md:col-span-2 flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setEditingProductId(null);
-                    setProductError(null);
-                  }}
-                  className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={productSaving}
-                  className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {productSaving ? "Guardando..." : "Guardar producto"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <ProductFormModal
+        open={showProductModal}
+        editingProductId={editingProductId}
+        categories={categories}
+        loadingCategories={loadingCategories}
+        onClose={() => {
+          setShowProductModal(false);
+          setEditingProductId(null);
+        }}
+        onSaved={reloadMenuProducts}
+        onRequestNewCategory={() => {
+          setCategoryModalHint(null);
+          setShowCategoryModal(true);
+        }}
+      />
     </div>
   );
 }

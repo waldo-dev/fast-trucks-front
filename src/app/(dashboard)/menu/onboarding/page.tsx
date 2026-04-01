@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-toastify";
 import Link from "next/link";
+import { CategoryCreateModal } from "@/components/products/CategoryCreateModal";
+import { ProductFormModal } from "@/components/products/ProductFormModal";
 import { useOperatingContext } from "@/lib/hooks/useOperatingContext";
-import { menuUploadService } from "@/lib/services";
+import { categoryService, menuUploadService } from "@/lib/services";
 
 type TabKey = "csv" | "file" | "manual";
 
@@ -30,6 +32,57 @@ export default function MenuOnboardingPage() {
   const [menuFile, setMenuFile] = useState<File | null>(null);
   const [finalize, setFinalize] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const [categories, setCategories] = useState<
+    Array<{ id: string; name: string; icon?: string }>
+  >([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [categoryModalHint, setCategoryModalHint] = useState<string | null>(null);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<number | null>(null);
+
+  const reloadCategories = useCallback(async () => {
+    if (!businessId) {
+      setCategories([]);
+      return;
+    }
+    setLoadingCategories(true);
+    try {
+      const resp = await categoryService.listByOwner({ business_id: businessId });
+      const list = (resp as any)?.data ?? resp;
+      const mapped = Array.isArray(list)
+        ? list.map((c: any) => ({
+            id: String(c?.id ?? ""),
+            name: c?.name || "Sin nombre",
+            icon: "category" as const,
+          }))
+        : [];
+      setCategories(mapped.filter((c) => c.id));
+    } catch {
+      setCategories([]);
+    } finally {
+      setLoadingCategories(false);
+    }
+  }, [businessId]);
+
+  useEffect(() => {
+    void reloadCategories();
+  }, [reloadCategories]);
+
+  const openManualProductFlow = () => {
+    if (!businessId) {
+      toast.error("Selecciona un negocio para continuar");
+      return;
+    }
+    if (!categories.length) {
+      setCategoryModalHint("Primero crea una categoría para asociar el producto.");
+      setShowCategoryModal(true);
+      return;
+    }
+    setEditingProductId(null);
+    setShowProductModal(true);
+  };
 
   const canSubmit = useMemo(() => {
     if (!businessId) return false;
@@ -185,17 +238,53 @@ export default function MenuOnboardingPage() {
         )}
 
         {tab === "manual" && (
-          <div className="space-y-2">
+          <div className="space-y-4">
             <p className="text-sm text-[#8a7560]">
-              Puedes continuar cargando productos manualmente dentro de “Menú”. Si ya está listo,
-              marca “Finalizar” para activar el negocio.
+              Crea productos con el mismo formulario que en <strong>Productos</strong>: nombre,
+              precio, categoría (puedes crear categorías nuevas), imagen opcional, etc. Cuando
+              termines de cargar el catálogo, marca <strong>Finalizar</strong> abajo para activar
+              el negocio o vuelve al resumen del menú.
             </p>
-            <Link
-              href="/menu"
-              className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-[#e6e0db] text-[#5d4b3f] font-bold text-sm hover:bg-[#f7f3ef]"
-            >
-              Volver a Menú
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={openManualProductFlow}
+                disabled={!businessId}
+                className="inline-flex items-center justify-center h-10 px-4 rounded-xl bg-primary text-white font-bold text-sm hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Crear producto
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!businessId) {
+                    toast.error("Selecciona un negocio para continuar");
+                    return;
+                  }
+                  setCategoryModalHint(null);
+                  setShowCategoryModal(true);
+                }}
+                disabled={!businessId}
+                className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-[#e6e0db] text-[#5d4b3f] font-bold text-sm hover:bg-[#f7f3ef] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Nueva categoría
+              </button>
+              <Link
+                href="/menu"
+                className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-[#e6e0db] text-[#5d4b3f] font-bold text-sm hover:bg-[#f7f3ef]"
+              >
+                Ir al menú
+              </Link>
+            </div>
+            {businessId && (
+              <p className="text-xs text-[#8a7560]">
+                {loadingCategories
+                  ? "Cargando categorías…"
+                  : categories.length === 0
+                    ? "Aún no hay categorías: usa “Nueva categoría” o el enlace dentro del formulario de producto."
+                    : `${categories.length} categoría(s) disponible(s) para tus productos.`}
+              </p>
+            )}
           </div>
         )}
 
@@ -220,6 +309,32 @@ export default function MenuOnboardingPage() {
           </button>
         </div>
       </div>
+
+      <CategoryCreateModal
+        open={showCategoryModal}
+        contextHint={categoryModalHint}
+        onClose={() => {
+          setShowCategoryModal(false);
+          setCategoryModalHint(null);
+        }}
+        onCreated={reloadCategories}
+      />
+
+      <ProductFormModal
+        open={showProductModal}
+        editingProductId={editingProductId}
+        categories={categories}
+        loadingCategories={loadingCategories}
+        onClose={() => {
+          setShowProductModal(false);
+          setEditingProductId(null);
+        }}
+        onSaved={reloadCategories}
+        onRequestNewCategory={() => {
+          setCategoryModalHint(null);
+          setShowCategoryModal(true);
+        }}
+      />
     </div>
   );
 }

@@ -10,7 +10,7 @@ import {
 } from '@/lib/constants';
 import { getCachedUser, getCurrentUser } from '@/lib/auth';
 import { hasFeature, normalizeTier } from '@/lib/planAccess';
-import { readOperatingContext, writeOperatingContext } from '@/lib/operatingContext';
+import { readOperatingContext, watchOperatingContext, writeOperatingContext } from '@/lib/operatingContext';
 import { businessService, eventService, subscriptionService } from '@/lib/services';
 
 type OperatingContext =
@@ -61,6 +61,13 @@ export const useDashboardNavigation = (): UseDashboardNavigationResult => {
 
   useEffect(() => {
     setOperatingContext(readOperatingContext());
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = watchOperatingContext((ctx) => {
+      setOperatingContext(ctx as any);
+    });
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
