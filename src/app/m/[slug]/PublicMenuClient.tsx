@@ -18,6 +18,9 @@ type CartItem = {
   quantity: number;
 };
 
+/** Origen del pedido desde el menú público (no es “WEB”; el backend suele validar enum tipo ONLINE / POS / EVENT). */
+const PUBLIC_MENU_ORDER_SOURCE = "ONLINE" as const;
+
 const formatClp = (value: number) => {
   try {
     return new Intl.NumberFormat("es-CL", {
@@ -223,7 +226,7 @@ export function PublicMenuClient({
       const payload: any = {
         ...(effectiveBusinessId ? { business_id: effectiveBusinessId } : {}),
         order_type: orderType === "delivery" ? "DELIVERY" : "PICKUP",
-        order_source: "WEB",
+        order_source: PUBLIC_MENU_ORDER_SOURCE,
         payment_method: paymentMethod,
         items: cart.map((it) => ({
           product_id: it.product.id,
@@ -462,10 +465,6 @@ export function PublicMenuClient({
               >
                 {submitting ? "Enviando pedido..." : "Realizar pedido"}
               </button>
-              <p className="text-xs text-[#8a7560]">
-                Endpoints: <span className="font-semibold">`GET public/menu`</span> y{" "}
-                <span className="font-semibold">`POST public/orders`</span>.
-              </p>
             </div>
           </aside>
         </div>
