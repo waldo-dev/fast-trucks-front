@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 // import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { BusinessSelectionModal } from './BusinessSelectionModal';
 import { getCachedUser, logout } from '@/lib/auth';
 import { normalizeRoleLabel } from '@/lib/constants';
 import { usePathname, useRouter } from 'next/navigation';
@@ -68,6 +69,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     <div className="h-screen overflow-hidden bg-background-light dark:bg-background-dark flex">
       {/* <Sidebar isMobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} /> */}
       <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
+        <BusinessSelectionModal />
         <Topbar
           userName={userName}
           userRoleLabel={userRoleLabel}
