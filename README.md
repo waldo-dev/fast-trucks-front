@@ -2,6 +2,10 @@
 
 Panel administrativo para locales de comida rápida construido con Next.js 14+, TypeScript y Tailwind CSS.
 
+## Plan de producto y pilotos
+
+El [spec, plan de ejecución y validación comercial](docs/operfoods/README.md) están listos para retomar. Incluyen un [mapa técnico](docs/operfoods/GRAPHIFY.md) y el [Graphify interactivo](graphify-out/graph.html). Estado: planificación; mejoras no iniciadas.
+
 ## 🚀 Inicio Rápido
 
 ### Instalación
